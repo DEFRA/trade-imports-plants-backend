@@ -1,4 +1,4 @@
-﻿# Multi-stage Dockerfile for CDP Java Backend Template
+﻿# Multi-stage Dockerfile for Trade Imports Plants Backend
 # Uses Amazon Corretto 25 (matches project configuration)
 
 ################################################################################
