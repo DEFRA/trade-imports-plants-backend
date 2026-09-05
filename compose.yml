@@ -35,7 +35,7 @@ services:
   trade-imports-plants-backend:
     build: ./
     ports:
-      - '8085:8085'
+      - '8091:8091'
       - '5006:5005' # Java debug port
     depends_on:
       floci:
@@ -45,7 +45,7 @@ services:
     env_file:
       - 'compose/aws.env'
     environment:
-      PORT: 8085
+      PORT: 8091
 
       MONGO_URI: mongodb://mongodb:27017
 

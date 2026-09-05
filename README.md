@@ -1,4 +1,24 @@
-CDP Java Spring Boot backend template.
+# trade-imports-plants-backend
+
+The API and business-logic service behind the high-risk plants import
+notification journey. It is a Java Spring Boot service on the CDP platform,
+storing notifications in MongoDB.
+
+Its one domain package today is
+`uk.gov.defra.trade.imports.plants.notification`: the notification aggregate,
+its fulfilments, the repository, the controller and the reference-number
+generator, plus an expiry sweeper and an audit trail. The plants alpha persists
+obligations and fulfilments only — there is no outbox, no GBN-AG event
+publishing and no PIMS routing.
+
+The frontend for this service is
+[DEFRA/trade-imports-plants-frontend](https://github.com/DEFRA/trade-imports-plants-frontend),
+which documents the shared notification-journey platform under
+`src/server/app/docs/`. Deployed end-to-end tests live in the shared tests
+repository `trade-imports-animals-tests`, run against the workspace stack in
+[DEFRA/trade-imports-workspace](https://github.com/DEFRA/trade-imports-workspace).
+
+Integration tests need Failsafe, so run `mvn verify` — `mvn test` skips them.
 
 * [Install MongoDB](#install-mongodb)
 * [Inspect MongoDB](#inspect-mongodb)

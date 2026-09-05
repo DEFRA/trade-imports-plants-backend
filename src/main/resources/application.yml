@@ -1,5 +1,5 @@
 server:
-  port: ${PORT:8085}
+  port: ${PORT:8091}
   shutdown: graceful
 
 spring:
@@ -10,7 +10,7 @@ spring:
       uri: ${MONGO_URI:mongodb://localhost:27017/}
       database: ${MONGO_DATABASE:trade-imports-plants-backend}
       auto-index-creation: true
-      read-preference: ${MONGO_READ_PREFERENCE:secondary}
+      read-preference: ${MONGO_READ_PREFERENCE:primary}
       write-concern: ${MONGO_WRITE_CONCERN:majority}
       connection-pool:
         min-size: ${MONGO_POOL_MIN_SIZE:10}
@@ -21,6 +21,12 @@ spring:
         enabled: true
   lifecycle:
     timeout-per-shutdown-phase: 30s
+  jackson:
+    serialization:
+      # The Notification content sub-object is a deliberate placeholder with no fields until the
+      # plants data model is agreed, and Jackson refuses to serialize a zero-property bean by
+      # default. Remove this once Notification carries fields.
+      fail-on-empty-beans: false
 
 
 # CDP platform configuration
@@ -50,7 +56,7 @@ aws:
 logging:
   level:
     root: ${LOG_LEVEL:info}
-    uk.gov.defra.trade.imports.plants.backend: ${LOG_LEVEL:DEBUG}
+    uk.gov.defra.trade.imports.plants: ${LOG_LEVEL:DEBUG}
     org.springframework: ${LOGGING_LEVEL_ORG_SPRINGFRAMEWORK:INFO}
     org.springframework.web: ${LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_WEB:INFO}
     org.mongodb: ${LOGGING_LEVEL_ORG_MONGODB_DRIVER:WARN}
@@ -93,6 +99,30 @@ management:
         server:
           requests:
             active: true
+
+notification:
+  admin:
+    page-size: 50
+  list:
+    page-size: 25
+  # Automatic expiry of app-created notifications in non-prod environments.
+  # Defaults here are the prod-safe values: days unset (no stamping) and sweep disabled.
+  # Non-prod environments opt in via NOTIFICATION_TTL_DAYS and NOTIFICATION_TTL_SWEEP_ENABLED.
+  ttl:
+    days: ${NOTIFICATION_TTL_DAYS:}
+    environment: ${ENVIRONMENT:local}
+    sweep:
+      enabled: ${NOTIFICATION_TTL_SWEEP_ENABLED:false}
+      interval-ms: 3600000
+      batch-size: 10
+      lock-at-least-for: 1s
+      lock-at-most-for: 30s
+
+mongo:
+  transaction:
+    commit-retry:
+      timeout-ms: ${MONGO_TX_COMMIT_RETRY_TIMEOUT_MS:120000}
+      backoff-ms: ${MONGO_TX_COMMIT_RETRY_BACKOFF_MS:100}
 
 # Application info (exposed via /info endpoint)
 info:

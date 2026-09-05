@@ -29,7 +29,7 @@ COPY src ./src
 RUN mvn clean package -DskipTests -B
 
 ################################################################################
-# Stage 2: Development
+# Stage 2: Development (run pre-built JAR)
 # - Includes development tools
 # - For local development with docker compose
 ################################################################################
@@ -47,17 +47,52 @@ COPY --from=build /build/target/*.jar app.jar
 USER nobody
 
 # Default port (configurable via PORT env var)
-EXPOSE 8085
+EXPOSE 8091
 
 # Health check (for local docker run)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD curl -f http://localhost:8085/health || exit 1
+  CMD curl -f http://localhost:8091/health || exit 1
 
 # Start application
 ENTRYPOINT ["java", "-jar", "app.jar"]
 
 ################################################################################
-# Stage 3: Production
+# Stage 3: Dev-run (Maven source mount)
+# - Maven present; no pre-built JAR
+# - Mount src/ from host; docker/dev-run.sh recompiles on save and Spring Boot
+#   DevTools restarts the running context, so .java edits hot-reload with no
+#   image rebuild or container bounce
+# - Usage: make docker-compose-dev (backend variant)
+################################################################################
+FROM amazoncorretto:25-alpine AS dev-run
+
+WORKDIR /app
+
+# Maven + curl for healthcheck; bash for the dev-run entrypoint
+RUN apk add --no-cache maven curl bash
+
+# Reuse the fully-warmed Maven cache from the build stage. The build stage runs
+# mvn clean package which downloads all deps including optional transitives that
+# dependency:go-offline misses (e.g. nimbus-jose-jwt's optional spring-security-crypto).
+COPY --from=build /root/.m2 /root/.m2
+COPY pom.xml .
+
+# Source is volume-mounted at runtime; copy here only so the image builds
+COPY src ./src
+
+# Hot-reload entrypoint: mtime-poll compile loop + `mvn spring-boot:run`
+COPY docker/dev-run.sh /usr/local/bin/dev-run.sh
+RUN chmod +x /usr/local/bin/dev-run.sh
+
+EXPOSE 8091
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \
+  CMD curl -f http://localhost:8091/health || exit 1
+
+CMD ["dev-run.sh"]
+
+################################################################################
+# Stage 4: Production
 # - Minimal runtime image
 # - Meets all CDP platform requirements
 ################################################################################
@@ -66,7 +101,7 @@ FROM amazoncorretto:25-alpine AS production
 WORKDIR /app
 
 # CDP PLATFORM REQUIREMENTS:
-# - curl: Required for ECS healthcheck (curl -f http://localhost:8085/health || exit 1)
+# - curl: Required for ECS healthcheck (curl -f http://localhost:8091/health || exit 1)
 # - shell: Required for CMD-SHELL healthcheck (/bin/sh -c)
 RUN apk add --no-cache curl
 
@@ -76,17 +111,17 @@ COPY --from=build /build/target/*.jar app.jar
 # Non-root user (CDP security requirement)
 USER nobody
 
-# Port 8085 (CDP platform standard)
-EXPOSE 8085
+# Port 8091 (CDP platform standard)
+EXPOSE 8091
 
 # Health check configuration
 # Note: ECS configures this at platform level, but including for local testing
-# ECS uses: ["CMD-SHELL", "curl -f http://localhost:8085/health || exit 1"]
+# ECS uses: ["CMD-SHELL", "curl -f http://localhost:8091/health || exit 1"]
 # - Interval: 30 seconds
 # - Timeout: 5 seconds
 # - Retries: 3 (max 95 seconds before restart)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD curl -f http://localhost:8085/health || exit 1
+  CMD curl -f http://localhost:8091/health || exit 1
 
 # ENTRYPOINT with no parameters (CDP requirement)
 # ECS doesn't support runtime arguments
