@@ -22,7 +22,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'corretto'
-          java-version: 25
+          java-version-file: '.java-version'
           cache: 'maven'
 
       - name: Run tests with Testcontainers
@@ -31,7 +31,7 @@ jobs:
       - name: Test Docker Image Build
         run: |
           set +e
-          docker build --no-cache --tag cdp-java-backend-template .
+          docker build --no-cache --tag trade-imports-plants-backend .
           exit $?
 
 #      - name: SonarCloud Scan

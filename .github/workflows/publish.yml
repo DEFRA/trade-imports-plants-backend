@@ -27,6 +27,17 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v5
+
+      # Publishing an image whose tests never ran is worse than a slow publish.
+      # verify, not test: Failsafe owns the integration tests.
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'corretto'
+          java-version-file: '.java-version'
+          cache: 'maven'
+      - run: mvn clean verify
+
       - name: Build and Publish
         uses: DEFRA/cdp-build-action/build@main
         with:
