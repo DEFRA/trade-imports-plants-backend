@@ -181,6 +181,26 @@ class NotificationIT extends IntegrationBase {
     }
 
     @Test
+    void list_shouldCarryTheSubmissionTimestampOnceTheNotificationIsSubmitted() throws Exception {
+        // Given — a draft has no submission timestamp to carry
+        NotificationAggregate created = createDraft(List.of());
+        mockMvc.perform(get("/notifications"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.content[0].status").value("DRAFT"))
+            .andExpect(jsonPath("$.content[0].submittedAt").isEmpty());
+
+        // When
+        mockMvc.perform(post("/notifications/{ref}/submit", created.getReferenceNumber()))
+            .andExpect(status().isOk());
+
+        // Then — the list projection loads submittedAt from the aggregate, not just the single read
+        mockMvc.perform(get("/notifications"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.content[0].status").value("SUBMITTED"))
+            .andExpect(jsonPath("$.content[0].submittedAt").isNotEmpty());
+    }
+
+    @Test
     void softDelete_shouldRemoveTheNotificationFromTheDashboardList() throws Exception {
         // Given
         NotificationAggregate created = createDraft(List.of());

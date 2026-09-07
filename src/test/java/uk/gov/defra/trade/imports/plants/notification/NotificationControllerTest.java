@@ -34,6 +34,7 @@ import uk.gov.defra.trade.imports.plants.exceptions.NotFoundException;
 class NotificationControllerTest {
 
     private static final String REFERENCE = "26-ABC123";
+    private static final LocalDateTime SUBMITTED_AT = LocalDateTime.of(2026, 7, 14, 10, 30, 15);
 
     @Autowired
     private MockMvc mockMvc;
@@ -185,7 +186,8 @@ class NotificationControllerTest {
     void findAll_shouldReturnThePaginationEnvelope() throws Exception {
         // Given
         when(notificationService.findAll(1, null, null)).thenReturn(new NotificationPageResponse(
-            List.of(new NotificationView.Data(REFERENCE, 1L, NotificationStatus.DRAFT, LocalDateTime.now())),
+            List.of(new NotificationView.Data(
+                REFERENCE, 1L, NotificationStatus.SUBMITTED, LocalDateTime.now(), SUBMITTED_AT)),
             1, 25, 1, 1L, 1));
 
         // When / Then
@@ -193,6 +195,8 @@ class NotificationControllerTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.content.length()").value(1))
             .andExpect(jsonPath("$.content[0].referenceNumber").value(REFERENCE))
+            .andExpect(jsonPath("$.content[0].status").value("SUBMITTED"))
+            .andExpect(jsonPath("$.content[0].submittedAt").value(SUBMITTED_AT.toString()))
             .andExpect(jsonPath("$.totalElements").value(1));
     }
 
