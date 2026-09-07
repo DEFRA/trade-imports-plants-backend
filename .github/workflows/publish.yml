@@ -6,9 +6,8 @@ on:
       - main
 
 concurrency:
-  group: $${{ github.workflow }}
+  group: ${{ github.workflow }}
   cancel-in-progress: false
-  queue: max
 
 permissions:
   id-token: write
@@ -42,12 +41,18 @@ jobs:
         uses: DEFRA/cdp-build-action/build@main
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-  ## SonarCloud
-  ## Uncomment to unable SonarCloud scan
-  ## Requires project to be set up in SonarCloud
-  ## and the SonarCloud token to be set in the repository secrets
-#   sonarcloud-scan:
-#     name: CDP SonarCloud Scan
-#     uses: ./.github/workflows/sonarcloud.yml
-#     needs: build
-#     secrets: inherit
+
+  # Adds linux/arm64 to the Docker Hub tags the build job has just published.
+  # Runs after it, never gates it, and never touches ECR.
+  publish-arm64:
+    needs: build
+    uses: DEFRA/trade-imports-workspace/.github/workflows/publish-multiarch.yml@main
+    with:
+      image-name: trade-imports-plants-backend
+
+  sonarcloud:
+    name: SonarCloud Scan
+    needs: build
+    if: github.actor != 'dependabot[bot]'
+    uses: ./.github/workflows/sonarcloud.yml
+    secrets: inherit
