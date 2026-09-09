@@ -21,7 +21,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: corretto
-          java-version: 25
+          java-version-file: .java-version
           cache: maven
 
       - name: Prepare Sonar cache directory
