@@ -6,10 +6,12 @@ import static uk.gov.defra.trade.imports.plants.notification.ReferenceNumberGene
 import java.time.LocalDate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Asserts against {@link ReferenceNumberGenerator#REFERENCE_NUMBER_PATTERN} rather than a
- * literal. The human-facing type code is not yet agreed, so the reference carries no prefix.
+ * literal, with an independent assertion for the agreed plants prefix.
  */
 class ReferenceNumberGeneratorTest {
 
@@ -33,12 +35,12 @@ class ReferenceNumberGeneratorTest {
     }
 
     @Test
-    void generate_shouldStartWithTheCurrentTwoDigitYear() {
+    void generate_shouldStartWithThePlantsPrefixAndCurrentTwoDigitYear() {
         // When
         String result = generator.generate();
 
         // Then
-        assertThat(result).startsWith(CURRENT_YY + "-");
+        assertThat(result).startsWith("GBN-HRP-" + CURRENT_YY + "-");
     }
 
     @Test
@@ -56,12 +58,11 @@ class ReferenceNumberGeneratorTest {
         }
     }
 
-    @Test
-    void referenceNumberPattern_shouldRejectAPrefixedReference() {
-        // Given a reference minted for a different journey
-        String prefixedReference = "XX-26-ABC123";
+    @ParameterizedTest
+    @ValueSource(strings = {"26-ABC123", "GBN-AG-26-ABC123", "GBN-HRP-26-ABC12I", "GBN-HRP-26-ABC12"})
+    void referenceNumberPattern_shouldRejectInvalidReferences(String reference) {
 
         // When / Then
-        assertThat(prefixedReference).doesNotMatch(REFERENCE_NUMBER_PATTERN);
+        assertThat(reference).doesNotMatch(REFERENCE_NUMBER_PATTERN);
     }
 }

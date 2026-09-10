@@ -19,6 +19,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import org.bson.Document;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.dao.OptimisticLockingFailureException;
@@ -33,7 +35,7 @@ import uk.gov.defra.trade.imports.plants.exceptions.NotFoundException;
 @org.springframework.context.annotation.Import(GlobalExceptionHandler.class)
 class NotificationControllerTest {
 
-    private static final String REFERENCE = "26-ABC123";
+    private static final String REFERENCE = "GBN-HRP-26-ABC123";
     private static final LocalDateTime SUBMITTED_AT = LocalDateTime.of(2026, 7, 14, 10, 30, 15);
 
     @Autowired
@@ -96,10 +98,11 @@ class NotificationControllerTest {
             .andExpect(jsonPath("$.referenceNumber").value(REFERENCE));
     }
 
-    @Test
-    void put_shouldReturn400_whenReferenceNumberDoesNotMatchThePlantsPattern() throws Exception {
-        // Given a reference minted for another journey
-        mockMvc.perform(put("/notifications/{ref}", "XX-26-ABC123")
+    @ParameterizedTest
+    @ValueSource(strings = {"26-ABC123", "GBN-AG-26-ABC123", "GBN-HRP-26-ABC12I"})
+    void put_shouldReturn400_whenReferenceNumberDoesNotMatchThePlantsPattern(String reference) throws Exception {
+        // When — an unprefixed, other-journey or malformed reference is supplied
+        mockMvc.perform(put("/notifications/{ref}", reference)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(SaveNotificationDto.of(
                     NotificationDto.builder().concurrencyToken(1L).build()))))
