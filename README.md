@@ -15,7 +15,7 @@ The frontend for this service is
 [DEFRA/trade-imports-plants-frontend](https://github.com/DEFRA/trade-imports-plants-frontend),
 which documents the shared notification-journey platform under
 `src/server/app/docs/`. Deployed end-to-end tests live in the shared tests
-repository `trade-imports-animals-tests`, run against the workspace stack in
+repository `trade-imports-ins-tests` (its `plants` project), run against the workspace stack in
 [DEFRA/trade-imports-workspace](https://github.com/DEFRA/trade-imports-workspace).
 
 Integration tests need Failsafe, so run `mvn verify` — `mvn test` skips them.
