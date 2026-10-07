@@ -17,8 +17,10 @@ import uk.gov.defra.trade.imports.plants.notification.SaveNotificationDto;
 
 /**
  * The OpenAPI schema tells a caller that each timestamp is a moment: {@code format: date-time}.
- * The format is derived from the Java type, so this fails if a timestamp is typed as anything
- * but an {@code Instant} again.
+ * The format is derived from the Java type, so this fails if a timestamp is typed as a date, a
+ * string or a number. It does not tell an {@code Instant} from a {@code LocalDateTime}, which
+ * swagger also describes as {@code date-time}: the {@code Z} suffix on the wire is held by
+ * {@code NotificationControllerTest} and {@code NotificationIT}.
  *
  * <p>The schemas are resolved with the swagger model converters springdoc itself uses, rather
  * than read from {@code /v3/api-docs}. Every schema reachable from the request and response
