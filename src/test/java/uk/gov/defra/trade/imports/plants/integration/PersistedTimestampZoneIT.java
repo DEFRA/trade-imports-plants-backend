@@ -285,7 +285,7 @@ class PersistedTimestampZoneIT extends IntegrationBase {
         NotificationAggregate read = notificationRepository.findByReferenceNumber(REF).orElseThrow();
 
         // Then
-        assertThat(read.getFulfilments().getFirst().get("arrivalDate")).isEqualTo(dateShaped);
+        assertThat(read.getFulfilments().getFirst()).containsEntry("arrivalDate", dateShaped);
         assertThat(storedNotification().getList("fulfilments", Document.class).getFirst()
             .get("arrivalDate", String.class)).isEqualTo(dateShaped);
     }
