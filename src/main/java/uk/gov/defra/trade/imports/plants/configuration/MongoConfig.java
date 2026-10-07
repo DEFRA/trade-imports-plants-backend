@@ -17,8 +17,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.mongodb.MongoDatabaseFactory;
 import org.springframework.data.mongodb.MongoTransactionManager;
+import org.springframework.data.mongodb.core.convert.MongoCustomConversions;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import javax.net.ssl.SSLContext;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import uk.gov.defra.trade.imports.plants.configuration.tls.TrustStoreConfiguration;
 
@@ -77,6 +79,19 @@ public class MongoConfig {
       log.info("MongoDB client configuration complete");
       
     return builder.build();
+  }
+
+  /**
+   * Registers the {@code LocalDate} string converters ahead of Spring Data's built-in JSR-310
+   * pair, so date-only fields persist as a {@code YYYY-MM-DD} string rather than a BSON date at
+   * start-of-day in the JVM's default timezone. See {@link LocalDateStringConverters} for the
+   * rationale.
+   */
+  @Bean
+  MongoCustomConversions mongoCustomConversions() {
+    return new MongoCustomConversions(List.of(
+        new LocalDateStringConverters.LocalDateToStringConverter(),
+        new LocalDateStringConverters.StringToLocalDateConverter()));
   }
 
   @Bean

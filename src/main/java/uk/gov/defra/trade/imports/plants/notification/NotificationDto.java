@@ -1,6 +1,6 @@
 package uk.gov.defra.trade.imports.plants.notification;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -21,9 +21,9 @@ public class NotificationDto {
 
     private NotificationStatus status;
 
-    private LocalDateTime created;
+    private Instant created;
 
-    private LocalDateTime updated;
+    private Instant updated;
 
     private Long concurrencyToken;
 

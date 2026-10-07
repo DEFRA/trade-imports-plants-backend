@@ -2,7 +2,8 @@ package uk.gov.defra.trade.imports.plants.notification;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import org.bson.Document;
 import org.junit.jupiter.api.BeforeEach;
@@ -56,8 +57,8 @@ class NotificationCopyMapperTest {
             .referenceNumber("26-ABC123")
             .concurrencyToken(4L)
             .status(NotificationStatus.SUBMITTED)
-            .created(LocalDateTime.now().minusDays(3))
-            .updated(LocalDateTime.now())
+            .created(Instant.now().minus(3, ChronoUnit.DAYS))
+            .updated(Instant.now())
             .build();
 
         // When
