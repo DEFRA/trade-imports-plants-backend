@@ -46,6 +46,7 @@ class StrictLocalDateModuleTest {
     })
     void post_shouldReturn400_whenADateOnlyFieldCarriesATimeOrAnOffset(String value)
         throws Exception {
+        // When / Then — the date-only field is sent with a time or an offset
         mockMvc.perform(post(PROBE_PATH)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"arrivalDate\":\"%s\"}".formatted(value)))
@@ -57,6 +58,7 @@ class StrictLocalDateModuleTest {
 
     @Test
     void post_shouldBindTheCalendarDate_whenADateOnlyFieldIsADate() throws Exception {
+        // When / Then — the date-only field is sent as a plain calendar date
         mockMvc.perform(post(PROBE_PATH)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"arrivalDate\":\"2026-07-21\"}"))
