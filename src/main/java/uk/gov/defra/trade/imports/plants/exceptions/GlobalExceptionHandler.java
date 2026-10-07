@@ -7,6 +7,7 @@ import org.slf4j.MDC;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -59,6 +60,37 @@ public class GlobalExceptionHandler {
       errors.put(error.getField(), error.getDefaultMessage());
     }
     problemDetail.setProperty("errors", errors);
+
+    return problemDetail;
+  }
+
+  /**
+   * Handle a request body the parser could not read (400 Bad Request) — malformed JSON, or a
+   * value that does not fit its field, such as a date-only field sent with a time. Without this
+   * it falls to the catch-all handler and answers 500.
+   * <p>
+   * A problem type of its own, not field validation: nothing bound, so there is no
+   * {@code errors} map. The parser message is logged but deliberately not returned — it quotes
+   * the submitted value and names internal types.
+   */
+  @ExceptionHandler(HttpMessageNotReadableException.class)
+  public ProblemDetail handleUnreadableRequestBody(HttpMessageNotReadableException ex) {
+    String traceId = MDC.get(MDC_TRACE_ID);
+    log.warn("Unreadable request body (trace: {}): {}", traceId, ex.getMessage());
+
+    ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(
+        HttpStatus.BAD_REQUEST,
+        "Request body could not be read. Check the JSON is well-formed, that each date-only "
+            + "field is a date, for example 2026-12-12, and that each timestamp is an "
+            + "RFC 3339 instant, for example 2026-12-12T00:00:00Z"
+    );
+
+    problemDetail.setType(URI.create("https://api.cdp.defra.cloud/problems/malformed-request"));
+    problemDetail.setTitle("Malformed Request");
+
+    if (traceId != null) {
+      problemDetail.setProperty("traceId", traceId);
+    }
 
     return problemDetail;
   }

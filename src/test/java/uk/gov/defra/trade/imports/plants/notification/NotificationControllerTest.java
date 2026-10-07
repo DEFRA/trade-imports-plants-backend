@@ -15,7 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import org.bson.Document;
 import org.junit.jupiter.api.Test;
@@ -36,7 +36,7 @@ import uk.gov.defra.trade.imports.plants.exceptions.NotFoundException;
 class NotificationControllerTest {
 
     private static final String REFERENCE = "GBN-HRP-26-ABC123";
-    private static final LocalDateTime SUBMITTED_AT = LocalDateTime.of(2026, 7, 14, 10, 30, 15);
+    private static final Instant SUBMITTED_AT = Instant.parse("2026-07-14T10:30:15Z");
 
     @Autowired
     private MockMvc mockMvc;
@@ -53,7 +53,7 @@ class NotificationControllerTest {
             .referenceNumber(REFERENCE)
             .concurrencyToken(1L)
             .status(status)
-            .created(LocalDateTime.now())
+            .created(Instant.now())
             .fulfilments(List.of(new Document("obligationId", "consignment-details")))
             .build();
     }
@@ -80,6 +80,24 @@ class NotificationControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
             .andExpect(status().isBadRequest());
+
+        verify(notificationService, never()).saveNotification(any());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+        "{\"notification\":",
+        "{\"notification\":{\"created\":\"2026-07-14T10:30:15\"}}"
+    })
+    void post_shouldReturn400_whenTheBodyCannotBeRead(String body) throws Exception {
+        // When — malformed JSON, or a timestamp that is not an RFC 3339 instant
+        mockMvc.perform(post("/notifications")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+            // Then
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.type")
+                .value("https://api.cdp.defra.cloud/problems/malformed-request"));
 
         verify(notificationService, never()).saveNotification(any());
     }
@@ -190,7 +208,7 @@ class NotificationControllerTest {
         // Given
         when(notificationService.findAll(1, null, null)).thenReturn(new NotificationPageResponse(
             List.of(new NotificationView.Data(
-                REFERENCE, 1L, NotificationStatus.SUBMITTED, LocalDateTime.now(), SUBMITTED_AT)),
+                REFERENCE, 1L, NotificationStatus.SUBMITTED, Instant.now(), SUBMITTED_AT)),
             1, 25, 1, 1L, 1));
 
         // When / Then
@@ -199,7 +217,7 @@ class NotificationControllerTest {
             .andExpect(jsonPath("$.content.length()").value(1))
             .andExpect(jsonPath("$.content[0].referenceNumber").value(REFERENCE))
             .andExpect(jsonPath("$.content[0].status").value("SUBMITTED"))
-            .andExpect(jsonPath("$.content[0].submittedAt").value(SUBMITTED_AT.toString()))
+            .andExpect(jsonPath("$.content[0].submittedAt").value("2026-07-14T10:30:15Z"))
             .andExpect(jsonPath("$.totalElements").value(1));
     }
 

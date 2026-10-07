@@ -1,7 +1,7 @@
 package uk.gov.defra.trade.imports.plants.notification;
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 /**
  * Interface projection backing {@code GET /notifications?…} — the dashboard list row.
@@ -24,9 +24,9 @@ public interface NotificationView {
 
     NotificationStatus getStatus();
 
-    LocalDateTime getCreated();
+    Instant getCreated();
 
-    LocalDateTime getSubmittedAt();
+    Instant getSubmittedAt();
 
     /** Jackson deserialization target — flat, matches the on-wire JSON produced by the projection. */
     @lombok.Data
@@ -36,7 +36,7 @@ public interface NotificationView {
         private String referenceNumber;
         private Long concurrencyToken;
         private NotificationStatus status;
-        private LocalDateTime created;
-        private LocalDateTime submittedAt;
+        private Instant created;
+        private Instant submittedAt;
     }
 }
