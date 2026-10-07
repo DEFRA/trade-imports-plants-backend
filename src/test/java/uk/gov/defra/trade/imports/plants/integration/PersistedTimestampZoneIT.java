@@ -91,7 +91,8 @@ class PersistedTimestampZoneIT extends IntegrationBase {
 
     @Test
     void application_shouldPinTheJvmDefaultZoneToUtc() {
-        // The zone captured after the context loaded, before this class changed it.
+        // Given — the zone captured after the context loaded, before this class changed it
+        // When / Then
         assertThat(originalTimeZone.getID()).isEqualTo("UTC");
     }
 
@@ -235,7 +236,7 @@ class PersistedTimestampZoneIT extends IntegrationBase {
      */
     @Test
     void save_shouldStoreACalendarDateAsAnIsoDateString_whenJvmDefaultZoneIsBst() {
-        // When
+        // Given / When — a date-only property saved under the BST zone pinned in setUp
         mongoTemplate.save(new DateProbe("probe-1", ARRIVAL_DATE));
 
         // Then
