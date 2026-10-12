@@ -1,6 +1,7 @@
 package uk.gov.defra.trade.imports.plants.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.matchesPattern;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -9,7 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import org.bson.Document;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,6 +34,10 @@ import uk.gov.defra.trade.imports.plants.notification.SaveNotificationDto;
  * database rather than a mock.
  */
 class NotificationIT extends IntegrationBase {
+
+    /** An RFC 3339 instant in UTC: a date, a time, optional fractional seconds and a {@code Z}. */
+    private static final String UTC_INSTANT =
+        "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z";
 
     @Autowired
     private NotificationRepository notificationRepository;
@@ -201,6 +206,49 @@ class NotificationIT extends IntegrationBase {
     }
 
     @Test
+    void timestamps_shouldBeRfc3339InstantsWithAZSuffix_inEveryResponse() throws Exception {
+        // Given / When — the write response
+        MvcResult saved = mockMvc.perform(post("/notifications")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(SaveNotificationDto.of(
+                    NotificationDto.builder().fulfilments(List.of()).build()))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.created", matchesPattern(UTC_INSTANT)))
+            .andExpect(jsonPath("$.updated", matchesPattern(UTC_INSTANT)))
+            .andReturn();
+        String reference = objectMapper.readValue(
+            saved.getResponse().getContentAsString(), NotificationAggregate.class).getReferenceNumber();
+
+        mockMvc.perform(post("/notifications/{ref}/submit", reference))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.created", matchesPattern(UTC_INSTANT)))
+            .andExpect(jsonPath("$.updated", matchesPattern(UTC_INSTANT)))
+            .andExpect(jsonPath("$.submittedAt", matchesPattern(UTC_INSTANT)));
+
+        // Then — the two read projections
+        mockMvc.perform(get("/notifications"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.content[0].created", matchesPattern(UTC_INSTANT)))
+            .andExpect(jsonPath("$.content[0].submittedAt", matchesPattern(UTC_INSTANT)));
+        mockMvc.perform(get("/notifications/{ref}/fulfilments", reference))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.created", matchesPattern(UTC_INSTANT)))
+            .andExpect(jsonPath("$.submittedAt", matchesPattern(UTC_INSTANT)));
+    }
+
+    @Test
+    void post_shouldReturn400_whenTheBodyIsNotWellFormedJson() throws Exception {
+        // When / Then
+        mockMvc.perform(post("/notifications")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"notification\":"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.title").value("Malformed Request"));
+
+        assertThat(notificationRepository.count()).isZero();
+    }
+
+    @Test
     void softDelete_shouldRemoveTheNotificationFromTheDashboardList() throws Exception {
         // Given
         NotificationAggregate created = createDraft(List.of());
@@ -274,7 +322,7 @@ class NotificationIT extends IntegrationBase {
         NotificationAggregate first = notificationRepository.save(NotificationAggregate.builder()
             .referenceNumber("26-DPKEY2")
             .status(NotificationStatus.DRAFT)
-            .created(LocalDateTime.now())
+            .created(Instant.now())
             .build());
 
         // When / Then — a second document on the same reference is rejected by the index
@@ -283,7 +331,7 @@ class NotificationIT extends IntegrationBase {
                 notificationRepository.save(NotificationAggregate.builder()
                     .referenceNumber("26-DPKEY2")
                     .status(NotificationStatus.DRAFT)
-                    .created(LocalDateTime.now())
+                    .created(Instant.now())
                     .build()))
             .isInstanceOf(org.springframework.dao.DuplicateKeyException.class);
     }

@@ -1,6 +1,6 @@
 package uk.gov.defra.trade.imports.plants.notification;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import org.bson.Document;
 
@@ -18,9 +18,9 @@ public interface NotificationFulfilmentsView {
 
     NotificationStatus getStatus();
 
-    LocalDateTime getCreated();
+    Instant getCreated();
 
-    LocalDateTime getSubmittedAt();
+    Instant getSubmittedAt();
 
     List<Document> getFulfilments();
 }

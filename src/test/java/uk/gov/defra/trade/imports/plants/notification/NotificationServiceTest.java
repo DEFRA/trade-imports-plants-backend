@@ -9,9 +9,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Duration;
-import java.time.LocalDateTime;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
+import java.util.TimeZone;
 import org.bson.Document;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -77,7 +79,7 @@ class NotificationServiceTest {
             .referenceNumber(REFERENCE)
             .concurrencyToken(2L)
             .status(status)
-            .created(LocalDateTime.now().minusDays(1))
+            .created(Instant.now().minus(1, ChronoUnit.DAYS))
             .notification(new Notification())
             .build();
     }
@@ -145,7 +147,34 @@ class NotificationServiceTest {
             notificationService.saveNotification(NotificationDto.builder().build());
 
         // Then
-        assertThat(result.getExpireAt()).isEqualTo(result.getCreated().plusDays(7));
+        assertThat(result.getExpireAt()).isEqualTo(result.getCreated().plus(7, ChronoUnit.DAYS));
+    }
+
+    /**
+     * The expiry window is elapsed time, not wall-clock days. In a zone that observes daylight
+     * saving, seven wall-clock days across a clock change are an hour short or an hour long;
+     * seven days on an {@code Instant} are always 168 hours.
+     */
+    @Test
+    void saveNotification_shouldStampExpireAtAnExactNumberOfElapsedDaysAfterCreated_whenJvmDefaultZoneObservesDst() {
+        // Given
+        TimeZone originalTimeZone = TimeZone.getDefault();
+        TimeZone.setDefault(TimeZone.getTimeZone("Europe/London"));
+        try {
+            notificationService = newService(ttlConfig(7, "dev"));
+            when(referenceNumberGenerator.generate()).thenReturn(REFERENCE);
+            repositoryEchoesSaves();
+
+            // When
+            NotificationAggregate result =
+                notificationService.saveNotification(NotificationDto.builder().build());
+
+            // Then
+            assertThat(Duration.between(result.getCreated(), result.getExpireAt()))
+                .isEqualTo(Duration.ofHours(7 * 24));
+        } finally {
+            TimeZone.setDefault(originalTimeZone);
+        }
     }
 
     @Test
@@ -318,7 +347,7 @@ class NotificationServiceTest {
     @Test
     void cancelAmendNotification_shouldRestoreTheBaselineAndPreserveSubmittedAt() {
         // Given
-        LocalDateTime originalSubmittedAt = LocalDateTime.now().minusDays(2);
+        Instant originalSubmittedAt = Instant.now().minus(2, ChronoUnit.DAYS);
         NotificationAggregate amending = stored(NotificationStatus.AMEND);
         amending.setSubmittedAt(originalSubmittedAt);
         amending.setFulfilments(List.of(new Document("k", "edited")));
@@ -487,7 +516,7 @@ class NotificationServiceTest {
     @Test
     void deleteExpired_shouldDeleteTheDueBatchAndReturnItsSize() {
         // Given
-        when(notificationRepository.findExpired(any(LocalDateTime.class), any(PageRequest.class)))
+        when(notificationRepository.findExpired(any(Instant.class), any(PageRequest.class)))
             .thenReturn(List.of(() -> REFERENCE, () -> "26-DEF456"));
 
         // When
@@ -503,7 +532,7 @@ class NotificationServiceTest {
     @Test
     void deleteExpired_shouldDeleteNothing_whenNoneAreDue() {
         // Given
-        when(notificationRepository.findExpired(any(LocalDateTime.class), any(PageRequest.class)))
+        when(notificationRepository.findExpired(any(Instant.class), any(PageRequest.class)))
             .thenReturn(List.of());
 
         // When
