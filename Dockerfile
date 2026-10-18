@@ -37,7 +37,6 @@ FROM amazoncorretto:25-alpine AS development
 
 WORKDIR /app
 
-# UTC container clock — the JVM inherits it as ZoneId.systemDefault() (EUDPA-639)
 ENV TZ=UTC
 
 # Install curl and bash for development
@@ -71,7 +70,6 @@ FROM amazoncorretto:25-alpine AS dev-run
 
 WORKDIR /app
 
-# UTC container clock — the JVM inherits it as ZoneId.systemDefault() (EUDPA-639)
 ENV TZ=UTC
 
 # Maven + curl for healthcheck; bash for the dev-run entrypoint
@@ -106,7 +104,6 @@ FROM amazoncorretto:25-alpine AS production
 
 WORKDIR /app
 
-# UTC container clock — the JVM inherits it as ZoneId.systemDefault() (EUDPA-639)
 ENV TZ=UTC
 
 # CDP PLATFORM REQUIREMENTS:

@@ -142,15 +142,9 @@ class PersistedTimestampZoneIT extends IntegrationBase {
         assertThat(stored.get("timestamp", Date.class).toInstant()).isEqualTo(AUDIT_TIMESTAMP);
     }
 
-    /**
-     * A document written before EUDPA-639 holds a plain BSON date in each of these fields, exactly
-     * as one written after it does — the encoding did not change, only the Java type that reads
-     * it. Written here as raw BSON rather than through the repository, because the repository can
-     * no longer produce the old shape.
-     */
     @Test
-    void findByReferenceNumber_shouldReadBackEveryTimestamp_whenTheDocumentWasWrittenBeforeTheChange() {
-        // Given — a document in the pre-change shape: BSON dates written by the old converters
+    void findByReferenceNumber_shouldReadBackEveryTimestamp_whenTheDocumentHoldsRawBsonDates() {
+        // Given
         mongoTemplate.getCollection(NOTIFICATION_COLLECTION).insertOne(new Document()
             .append("referenceNumber", REF)
             .append("status", NotificationStatus.SUBMITTED.name())
