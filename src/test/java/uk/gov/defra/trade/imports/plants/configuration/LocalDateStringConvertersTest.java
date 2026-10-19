@@ -11,15 +11,9 @@ import org.junit.jupiter.params.provider.ValueSource;
 import uk.gov.defra.trade.imports.plants.configuration.LocalDateStringConverters.LocalDateToStringConverter;
 import uk.gov.defra.trade.imports.plants.configuration.LocalDateStringConverters.StringToLocalDateConverter;
 
-/**
- * A calendar date must store and read back as the same {@code YYYY-MM-DD} string whatever the
- * JVM default zone. Each case runs under a zone either side of UTC, and uses a BST summer date —
- * the one Spring Data's built-in converter stored a day early under {@code Europe/London}
- * (EUDPA-282).
- */
 class LocalDateStringConvertersTest {
 
-    private static final LocalDate DATE = LocalDate.of(2026, 7, 21);
+    private static final LocalDate BST_SUMMER_DATE = LocalDate.of(2026, 7, 21);
     private static final String STORED = "2026-07-21";
 
     private TimeZone originalZone;
@@ -41,7 +35,7 @@ class LocalDateStringConvertersTest {
         TimeZone.setDefault(TimeZone.getTimeZone(zoneId));
 
         // When & Then
-        assertThat(new LocalDateToStringConverter().convert(DATE)).isEqualTo(STORED);
+        assertThat(new LocalDateToStringConverter().convert(BST_SUMMER_DATE)).isEqualTo(STORED);
     }
 
     @ParameterizedTest
@@ -51,7 +45,7 @@ class LocalDateStringConvertersTest {
         TimeZone.setDefault(TimeZone.getTimeZone(zoneId));
 
         // When & Then
-        assertThat(new StringToLocalDateConverter().convert(STORED)).isEqualTo(DATE);
+        assertThat(new StringToLocalDateConverter().convert(STORED)).isEqualTo(BST_SUMMER_DATE);
     }
 
     @ParameterizedTest
@@ -61,9 +55,9 @@ class LocalDateStringConvertersTest {
         TimeZone.setDefault(TimeZone.getTimeZone(zoneId));
 
         // When
-        String stored = new LocalDateToStringConverter().convert(DATE);
+        String stored = new LocalDateToStringConverter().convert(BST_SUMMER_DATE);
 
         // Then
-        assertThat(new StringToLocalDateConverter().convert(stored)).isEqualTo(DATE);
+        assertThat(new StringToLocalDateConverter().convert(stored)).isEqualTo(BST_SUMMER_DATE);
     }
 }

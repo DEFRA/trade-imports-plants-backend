@@ -22,6 +22,7 @@ RUN mvn dependency:go-offline -B
 
 # Copy source code
 COPY src ./src
+COPY config ./config
 
 # Build without running tests
 # Tests are run separately in CI/CD pipeline and locally
@@ -37,7 +38,6 @@ FROM amazoncorretto:25-alpine AS development
 
 WORKDIR /app
 
-# UTC container clock — the JVM inherits it as ZoneId.systemDefault() (EUDPA-639)
 ENV TZ=UTC
 
 # Install curl and bash for development
@@ -71,7 +71,6 @@ FROM amazoncorretto:25-alpine AS dev-run
 
 WORKDIR /app
 
-# UTC container clock — the JVM inherits it as ZoneId.systemDefault() (EUDPA-639)
 ENV TZ=UTC
 
 # Maven + curl for healthcheck; bash for the dev-run entrypoint
@@ -85,6 +84,7 @@ COPY pom.xml .
 
 # Source is volume-mounted at runtime; copy here only so the image builds
 COPY src ./src
+COPY config ./config
 
 # Hot-reload entrypoint: mtime-poll compile loop + `mvn spring-boot:run`
 COPY docker/dev-run.sh /usr/local/bin/dev-run.sh
@@ -106,7 +106,6 @@ FROM amazoncorretto:25-alpine AS production
 
 WORKDIR /app
 
-# UTC container clock — the JVM inherits it as ZoneId.systemDefault() (EUDPA-639)
 ENV TZ=UTC
 
 # CDP PLATFORM REQUIREMENTS:
