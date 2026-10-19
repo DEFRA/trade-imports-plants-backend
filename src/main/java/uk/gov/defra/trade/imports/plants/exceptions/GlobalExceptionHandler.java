@@ -18,14 +18,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Global exception handler for REST API error responses.
- * <p>
- * Uses Spring 6 ProblemDetail (RFC 7807) for standardized error responses. Includes request trace
- * ID in error responses for log correlation.
- * <p>
- * CDP Compliance: - Structured error responses with trace ID - Proper HTTP status codes (400, 404,
- * 409, 500) - Validation errors with field-level details - Logs errors with trace ID for
- * troubleshooting
+ * Turns application exceptions into RFC 7807 {@link ProblemDetail} responses that carry the
+ * request's trace id, and logs each one with that trace id.
  */
 @RestControllerAdvice
 @Slf4j
@@ -49,12 +43,10 @@ public class GlobalExceptionHandler {
     problemDetail.setType(URI.create("https://api.cdp.defra.cloud/problems/validation-error"));
     problemDetail.setTitle("Validation Error");
 
-    // Add trace ID for log correlation
     if (traceId != null) {
       problemDetail.setProperty("traceId", traceId);
     }
 
-    // Add field-level validation errors
     Map<String, String> errors = new HashMap<>();
     for (FieldError error : ex.getBindingResult().getFieldErrors()) {
       errors.put(error.getField(), error.getDefaultMessage());
@@ -65,13 +57,9 @@ public class GlobalExceptionHandler {
   }
 
   /**
-   * Handle a request body the parser could not read (400 Bad Request) — malformed JSON, or a
-   * value that does not fit its field, such as a date-only field sent with a time. Without this
-   * it falls to the catch-all handler and answers 500.
-   * <p>
-   * A problem type of its own, not field validation: nothing bound, so there is no
-   * {@code errors} map. The parser message is logged but deliberately not returned — it quotes
-   * the submitted value and names internal types.
+   * Handle a request body the parser could not read (400 Bad Request): malformed JSON, or a value
+   * that does not fit its field, such as a date-only field sent with a time. The response has no
+   * {@code errors} map and does not echo the parser message.
    */
   @ExceptionHandler(HttpMessageNotReadableException.class)
   public ProblemDetail handleUnreadableRequestBody(HttpMessageNotReadableException ex) {
@@ -157,7 +145,7 @@ public class GlobalExceptionHandler {
 
   /**
    * Handle a write against a stale concurrency token (409 Conflict, code
-   * {@code STALE_CONCURRENCY_TOKEN}). The frontend re-reads and retries on this code.
+   * {@code STALE_CONCURRENCY_TOKEN}).
    */
   @ExceptionHandler(OptimisticLockingFailureException.class)
   public ProblemDetail handleOptimisticLockingFailure(OptimisticLockingFailureException ex) {
@@ -228,11 +216,7 @@ public class GlobalExceptionHandler {
   }
 
   /**
-   * Handle unexpected errors (500 Internal Server Error).
-   * <p>
-   * Note: Does NOT catch Spring framework exceptions like NoResourceFoundException (404) or other
-   * HTTP-related exceptions. Only catches application-level exceptions. This allows Spring to
-   * handle its own exceptions appropriately (e.g., 404 for missing endpoints).
+   * Handle unexpected runtime errors (500 Internal Server Error).
    */
   @ExceptionHandler({
       RuntimeException.class,
