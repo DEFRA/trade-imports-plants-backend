@@ -25,13 +25,13 @@
   <module name="TreeWalker">
     <module name="TodoComment">
       <property name="id" value="noTicketIdsInComments"/>
-      <property name="format" value="EUDPA-\d+|\b(c|d|q|inc|req)-\d{3}\b|Design Release|DR2\.?1|\bRuled\b|real service"/>
+      <property name="format" value="EUDPA-\d+|\b(c|cv|d|q|inc|req)-\d{3}\b|Design Release|DR2\.?1|\bRuled\b|real service"/>
       <message key="todo.match" value="Comments must not carry ticket keys, backlog or ruling ids, release names or session words."/>
     </module>
 
     <module name="RegexpSinglelineJava">
       <property name="id" value="noTicketIdsInTestTitles"/>
-      <property name="format" value="@DisplayName\(.*(EUDPA-\d+|\b(c|d|q|inc|req)-\d{3}\b|Design Release|DR2\.?1|\bRuled\b|real service)"/>
+      <property name="format" value="@DisplayName\(.*(EUDPA-\d+|\b(c|cv|d|q|inc|req)-\d{3}\b|Design Release|DR2\.?1|\bRuled\b|real service)"/>
       <property name="ignoreComments" value="true"/>
       <property name="message" value="Test titles must not carry ticket keys, backlog or ruling ids, release names or session words."/>
     </module>
