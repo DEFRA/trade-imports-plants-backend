@@ -400,12 +400,6 @@ public class NotificationService {
                 CANNOT_FIND_NOTIFICATION_WITH_REFERENCE_NUMBER + referenceNumber));
     }
 
-    private NotificationAggregate requireByReferenceNumber(String referenceNumber) {
-        return notificationRepository.findByReferenceNumber(referenceNumber)
-            .orElseThrow(() -> new NotFoundException(
-                CANNOT_FIND_NOTIFICATION_WITH_REFERENCE_NUMBER + referenceNumber));
-    }
-
     private void setNotificationDetails(NotificationDto dto, NotificationAggregate notificationAggregate) {
         if (notificationAggregate.getNotification() == null) {
             notificationAggregate.setNotification(new Notification());

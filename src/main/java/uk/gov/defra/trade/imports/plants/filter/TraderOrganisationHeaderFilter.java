@@ -43,10 +43,7 @@ public class TraderOrganisationHeaderFilter extends OncePerRequestFilter {
         if ("DELETE".equalsIgnoreCase(method) && "/notifications".equals(path)) {
             return true;
         }
-        if ("GET".equalsIgnoreCase(method) && "/notifications/reference-numbers".equals(path)) {
-            return true;
-        }
-        return false;
+        return "GET".equalsIgnoreCase(method) && "/notifications/reference-numbers".equals(path);
     }
 
     @Override

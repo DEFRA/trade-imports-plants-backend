@@ -11,7 +11,6 @@ import org.bson.Document;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.Version;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
-import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.index.Indexed;
 
 import static java.util.Objects.requireNonNull;
@@ -22,11 +21,9 @@ import static java.util.Objects.requireNonNull;
  * Amend baselines snapshot the two sub-objects independently.
  */
 @org.springframework.data.mongodb.core.mapping.Document(collection = "notification")
-@CompoundIndexes({
-    @CompoundIndex(
-        name = "organisationId_status_created",
-        def = "{'organisationId': 1, 'status': 1, 'created': -1}")
-})
+@CompoundIndex(
+    name = "organisationId_status_created",
+    def = "{'organisationId': 1, 'status': 1, 'created': -1}")
 @Data
 @Builder(toBuilder = true)
 @NoArgsConstructor
