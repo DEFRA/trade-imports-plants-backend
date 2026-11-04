@@ -8,10 +8,6 @@ import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import com.mongodb.connection.ConnectionPoolSettings;
 import lombok.extern.slf4j.Slf4j;
-import net.javacrumbs.shedlock.core.DefaultLockingTaskExecutor;
-import net.javacrumbs.shedlock.core.LockProvider;
-import net.javacrumbs.shedlock.core.LockingTaskExecutor;
-import net.javacrumbs.shedlock.provider.mongo.MongoLockProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -108,16 +104,5 @@ public class MongoConfig {
 
     return new CommitRetryingMongoTransactionManager(
         dbFactory, commitRetryTimeoutMs, commitRetryBackoffMs);
-  }
-
-  @Bean
-  LockProvider lockProvider(MongoClient mongoClient,
-      @Value("${spring.data.mongodb.database}") String dbName) {
-    return new MongoLockProvider(mongoClient.getDatabase(dbName));
-  }
-
-  @Bean
-  LockingTaskExecutor lockingTaskExecutor(LockProvider lockProvider) {
-    return new DefaultLockingTaskExecutor(lockProvider);
   }
 }

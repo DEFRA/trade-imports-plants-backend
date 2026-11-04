@@ -26,7 +26,6 @@ import uk.gov.defra.trade.imports.plants.audit.Audit;
 import uk.gov.defra.trade.imports.plants.audit.AuditRepository;
 import uk.gov.defra.trade.imports.plants.audit.Result;
 import uk.gov.defra.trade.imports.plants.notification.NotificationAggregate;
-import uk.gov.defra.trade.imports.plants.notification.NotificationReferenceOnly;
 import uk.gov.defra.trade.imports.plants.notification.NotificationRepository;
 import uk.gov.defra.trade.imports.plants.notification.NotificationSort;
 import uk.gov.defra.trade.imports.plants.notification.NotificationStatus;
@@ -172,25 +171,6 @@ class PersistedTimestampZoneIT extends IntegrationBase {
     }
 
     @Test
-    void findExpired_shouldSelectOnlyNotificationsWhoseExpireAtHasPassed_whenJvmDefaultZoneIsBst() {
-        // Given — one past its expiry, one exactly at it, one 30 minutes short, one never expiring
-        Instant now = EXPIRE_AT;
-        saveExpiring("GBN-HRP-26-EXP001", now.minus(1, ChronoUnit.DAYS));
-        saveExpiring("GBN-HRP-26-EXP002", now);
-        saveExpiring("GBN-HRP-26-EXP003", now.plus(30, ChronoUnit.MINUTES));
-        saveExpiring("GBN-HRP-26-EXP004", null);
-
-        // When
-        List<NotificationReferenceOnly> due =
-            notificationRepository.findExpired(now, PageRequest.of(0, 10));
-
-        // Then
-        assertThat(due)
-            .extracting(NotificationReferenceOnly::getReferenceNumber)
-            .containsExactlyInAnyOrder("GBN-HRP-26-EXP001", "GBN-HRP-26-EXP002");
-    }
-
-    @Test
     void save_shouldStoreACalendarDateAsAnIsoDateString_whenJvmDefaultZoneIsBst() {
         // Given / When — a date-only property saved under the BST zone pinned in setUp
         mongoTemplate.save(new DateProbe("probe-1", ARRIVAL_DATE));
@@ -235,15 +215,6 @@ class PersistedTimestampZoneIT extends IntegrationBase {
         assertThat(read.getFulfilments().getFirst()).containsEntry("arrivalDate", dateShaped);
         assertThat(storedNotification().getList("fulfilments", Document.class).getFirst()
             .get("arrivalDate", String.class)).isEqualTo(dateShaped);
-    }
-
-    private void saveExpiring(String referenceNumber, Instant expireAt) {
-        notificationRepository.save(NotificationAggregate.builder()
-            .referenceNumber(referenceNumber)
-            .status(NotificationStatus.DRAFT)
-            .created(CREATED)
-            .expireAt(expireAt)
-            .build());
     }
 
     private Document storedNotification() {

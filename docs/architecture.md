@@ -25,3 +25,16 @@
 
 - CDP sends all egress except database traffic through its proxy. `ProxyConfig` sets the JVM proxy properties and the default `ProxySelector` from `HTTP_PROXY`, so every Java HTTP client uses it.
 - A malformed proxy URL is logged with its user info replaced by `***`, and without the parse exception, because that exception's message quotes the whole URL, credentials included.
+
+## Automatic expiry outside prod
+
+Two independent safeguards keep expiry out of prod; both must fail before prod loses a notification:
+
+- Stamping: `expireAt` is set at creation only when `NOTIFICATION_TTL_DAYS` is configured and `ENVIRONMENT` is not `prod`.
+- Removal: `NotificationExpiryIndex` creates the Mongo TTL index on `expireAt` only when `NOTIFICATION_TTL_EXPIRY_ENABLED=true`, with no `matchIfMissing`, and refuses in prod.
+
+`expireAt` counts from `created`, so later edits do not extend it. Mongo's TTL monitor removes a notification within about a minute of its `expireAt` and skips notifications with no `expireAt`. Removal writes no audit record, because it is not a user action.
+
+- The index is created at startup rather than with `@Indexed(expireAfter)`, because `auto-index-creation` would build an annotated index in every environment, prod included.
+- Mongo refuses a TTL index on a key that already carries a plain index, so `NotificationExpiryIndex` drops any plain `expireAt` index first.
+- Switching the flag back off does not drop the TTL index.

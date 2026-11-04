@@ -296,36 +296,6 @@ public class NotificationService {
         createNotificationAuditRecord(referenceNumbers, auditContext, Result.SUCCESS);
     }
 
-    /**
-     * Deletes notifications whose {@code expireAt} has passed, up to {@code batchSize} per call.
-     * Called by the non-prod {@code NotificationExpirySweeper}; unlike
-     * {@link #deleteByReferenceNumbers} it writes no audit record. Notifications with a
-     * {@code null} {@code expireAt} are never selected.
-     *
-     * @param batchSize maximum number of notifications to remove in this run
-     * @return the number of notifications deleted
-     */
-    @Transactional
-    public int deleteExpired(int batchSize) {
-        List<NotificationReferenceOnly> due =
-            notificationRepository.findExpired(Instant.now(), PageRequest.of(0, batchSize));
-        if (due.isEmpty()) {
-            return 0;
-        }
-        List<String> referenceNumbers = due.stream()
-            .map(NotificationReferenceOnly::getReferenceNumber)
-            .toList();
-        log.info("Expiring {} notification(s)", referenceNumbers.size());
-        notificationRepository.deleteAllByReferenceNumberIn(referenceNumbers);
-        return referenceNumbers.size();
-    }
-
-    /**
-     * Stamps {@code expireAt} on a freshly-created notification, but only when both prod safeguards
-     * pass: a TTL duration is configured (non-prod config) and the running environment is not prod.
-     * Anchored to {@code created}, so a notification expires a fixed window after creation
-     * regardless of later activity.
-     */
     private void stampExpiry(NotificationAggregate notificationAggregate) {
         Integer days = ttlConfig.days();
         if (days == null || ttlConfig.isProd()) {
