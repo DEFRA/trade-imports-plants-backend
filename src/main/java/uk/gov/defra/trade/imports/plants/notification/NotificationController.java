@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import uk.gov.defra.trade.imports.plants.filter.TraderOrganisationHeaderFilter;
 
 /**
  * Notification endpoints for the plants journey.
@@ -42,6 +43,7 @@ public class NotificationController {
 
     public static final String HEADER_TRACE_ID = "x-cdp-request-id";
     public static final String HEADER_USER_ID = "User-Id";
+    public static final String HEADER_ORGANISATION_ID = TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER;
 
     private final NotificationService notificationService;
 
@@ -49,10 +51,12 @@ public class NotificationController {
     @Operation(summary = "Save notification", description = "Creates or updates a notification")
     @Timed("controller.postNotification.time")
     public ResponseEntity<NotificationAggregate> post(
-        @Valid @RequestBody SaveNotificationDto saveNotificationDto) {
+        @Valid @RequestBody SaveNotificationDto saveNotificationDto,
+        @RequestHeader(value = HEADER_ORGANISATION_ID) String organisationId) {
         NotificationDto notificationDto = saveNotificationDto.getNotification();
-        log.info("POST /notifications - referenceNumber={}", notificationDto.getReferenceNumber());
-        return ResponseEntity.ok(notificationService.saveNotification(notificationDto));
+        log.info("POST /notifications - referenceNumber={} organisationId={}",
+            notificationDto.getReferenceNumber(), organisationId);
+        return ResponseEntity.ok(notificationService.saveNotification(notificationDto, organisationId));
     }
 
     @PutMapping("/{referenceNumber}")
@@ -66,10 +70,12 @@ public class NotificationController {
     @Timed("controller.replaceNotification.time")
     public ResponseEntity<NotificationAggregate> replace(
         @Pattern(regexp = ReferenceNumberGenerator.REFERENCE_NUMBER_PATTERN) @PathVariable String referenceNumber,
-        @Valid @RequestBody SaveNotificationDto saveNotificationDto) {
-        log.info("PUT /notifications/{} - Replacing notification content", referenceNumber);
+        @Valid @RequestBody SaveNotificationDto saveNotificationDto,
+        @RequestHeader(value = HEADER_ORGANISATION_ID) String organisationId) {
+        log.info("PUT /notifications/{} - Replacing notification content organisationId={}",
+            referenceNumber, organisationId);
         return ResponseEntity.ok(
-            notificationService.replace(referenceNumber, saveNotificationDto.getNotification()));
+            notificationService.replace(referenceNumber, saveNotificationDto.getNotification(), organisationId));
     }
 
     @PostMapping("/{referenceNumber}/copy")
@@ -83,11 +89,12 @@ public class NotificationController {
     public ResponseEntity<NotificationAggregate> copy(
         @Pattern(regexp = ReferenceNumberGenerator.REFERENCE_NUMBER_PATTERN) @PathVariable String referenceNumber,
         @RequestParam Long concurrencyToken,
-        @RequestBody(required = false) ActorRequest actorRequest) {
+        @RequestBody(required = false) ActorRequest actorRequest,
+        @RequestHeader(value = HEADER_ORGANISATION_ID) String organisationId) {
         log.info("POST /notifications/{}/copy - Copying notification at expectedConcurrencyToken={}",
             referenceNumber, concurrencyToken);
         return ResponseEntity.ok(
-            notificationService.copyNotification(referenceNumber, concurrencyToken));
+            notificationService.copyNotification(referenceNumber, concurrencyToken, organisationId));
     }
 
     @PostMapping("/{referenceNumber}/submit")
@@ -100,9 +107,11 @@ public class NotificationController {
     @Timed("controller.submitNotification.time")
     public ResponseEntity<NotificationAggregate> submit(
         @Pattern(regexp = ReferenceNumberGenerator.REFERENCE_NUMBER_PATTERN) @PathVariable String referenceNumber,
-        @RequestBody(required = false) ActorRequest actorRequest) {
-        log.info("POST /notifications/{}/submit - Submitting notification", referenceNumber);
-        return ResponseEntity.ok(notificationService.submitNotification(referenceNumber));
+        @RequestBody(required = false) ActorRequest actorRequest,
+        @RequestHeader(value = HEADER_ORGANISATION_ID) String organisationId) {
+        log.info("POST /notifications/{}/submit - Submitting notification organisationId={}",
+            referenceNumber, organisationId);
+        return ResponseEntity.ok(notificationService.submitNotification(referenceNumber, organisationId));
     }
 
     @PostMapping("/{referenceNumber}/amend")
@@ -115,9 +124,11 @@ public class NotificationController {
     @Timed("controller.amendNotification.time")
     public ResponseEntity<NotificationAggregate> amend(
         @Pattern(regexp = ReferenceNumberGenerator.REFERENCE_NUMBER_PATTERN) @PathVariable String referenceNumber,
-        @RequestBody(required = false) ActorRequest actorRequest) {
-        log.info("POST /notifications/{}/amend - Amending notification", referenceNumber);
-        return ResponseEntity.ok(notificationService.amendNotification(referenceNumber));
+        @RequestBody(required = false) ActorRequest actorRequest,
+        @RequestHeader(value = HEADER_ORGANISATION_ID) String organisationId) {
+        log.info("POST /notifications/{}/amend - Amending notification organisationId={}",
+            referenceNumber, organisationId);
+        return ResponseEntity.ok(notificationService.amendNotification(referenceNumber, organisationId));
     }
 
     @PostMapping("/{referenceNumber}/cancel-amend")
@@ -130,9 +141,11 @@ public class NotificationController {
     @Timed("controller.cancelAmendNotification.time")
     public ResponseEntity<NotificationAggregate> cancelAmend(
         @Pattern(regexp = ReferenceNumberGenerator.REFERENCE_NUMBER_PATTERN) @PathVariable String referenceNumber,
-        @RequestBody(required = false) ActorRequest actorRequest) {
-        log.info("POST /notifications/{}/cancel-amend - Cancelling amendment", referenceNumber);
-        return ResponseEntity.ok(notificationService.cancelAmendNotification(referenceNumber));
+        @RequestBody(required = false) ActorRequest actorRequest,
+        @RequestHeader(value = HEADER_ORGANISATION_ID) String organisationId) {
+        log.info("POST /notifications/{}/cancel-amend - Cancelling amendment organisationId={}",
+            referenceNumber, organisationId);
+        return ResponseEntity.ok(notificationService.cancelAmendNotification(referenceNumber, organisationId));
     }
 
     @GetMapping
@@ -146,9 +159,10 @@ public class NotificationController {
     public NotificationPageResponse findAll(
         @RequestParam(defaultValue = "1") @Min(1) int page,
         @RequestParam(required = false) String sort,
-        @RequestParam(required = false) String referenceNumber) {
+        @RequestParam(required = false) String referenceNumber,
+        @RequestHeader(value = HEADER_ORGANISATION_ID) String organisationId) {
         log.debug("GET /notifications?page={}&sort={}&referenceNumber={}", page, sort, referenceNumber);
-        return notificationService.findAll(page, sort, referenceNumber);
+        return notificationService.findAll(page, sort, referenceNumber, organisationId);
     }
 
     @GetMapping("/{referenceNumber}/fulfilments")
@@ -157,11 +171,14 @@ public class NotificationController {
     @ApiResponse(responseCode = "200", description = "Fulfilment view returned",
         content = @Content(schema = @Schema(implementation = NotificationFulfilmentsView.class)))
     @ApiResponse(responseCode = "404", description = "Notification not found", content = @Content)
+    @ApiResponse(responseCode = "403", description = "Notification belongs to another organisation", content = @Content)
     @Timed("controller.getFulfilments.time")
     public ResponseEntity<NotificationFulfilmentsView> findFulfilments(
-        @Pattern(regexp = ReferenceNumberGenerator.REFERENCE_NUMBER_PATTERN) @PathVariable String referenceNumber) {
-        log.debug("GET /notifications/{}/fulfilments - Fetching fulfilment view", referenceNumber);
-        return ResponseEntity.ok(notificationService.findFulfilmentsView(referenceNumber));
+        @Pattern(regexp = ReferenceNumberGenerator.REFERENCE_NUMBER_PATTERN) @PathVariable String referenceNumber,
+        @RequestHeader(value = HEADER_ORGANISATION_ID) String organisationId) {
+        log.debug("GET /notifications/{}/fulfilments - Fetching fulfilment view organisationId={}",
+            referenceNumber, organisationId);
+        return ResponseEntity.ok(notificationService.findFulfilmentsView(referenceNumber, organisationId));
     }
 
     @GetMapping("/reference-numbers")
@@ -186,9 +203,11 @@ public class NotificationController {
     @Timed("controller.softDeleteNotification.time")
     public ResponseEntity<NotificationAggregate> softDelete(
         @Pattern(regexp = ReferenceNumberGenerator.REFERENCE_NUMBER_PATTERN) @PathVariable String referenceNumber,
-        @RequestBody(required = false) ActorRequest actorRequest) {
-        log.info("POST /notifications/{}/soft-delete - Soft deleting notification", referenceNumber);
-        return ResponseEntity.ok(notificationService.softDeleteNotification(referenceNumber));
+        @RequestBody(required = false) ActorRequest actorRequest,
+        @RequestHeader(value = HEADER_ORGANISATION_ID) String organisationId) {
+        log.info("POST /notifications/{}/soft-delete - Soft deleting notification organisationId={}",
+            referenceNumber, organisationId);
+        return ResponseEntity.ok(notificationService.softDeleteNotification(referenceNumber, organisationId));
     }
 
     @DeleteMapping
