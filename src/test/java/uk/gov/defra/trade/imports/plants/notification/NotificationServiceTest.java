@@ -22,7 +22,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.OptimisticLockingFailureException;
-import org.springframework.data.domain.PageRequest;
 import uk.gov.defra.trade.imports.plants.audit.Action;
 import uk.gov.defra.trade.imports.plants.audit.Audit;
 import uk.gov.defra.trade.imports.plants.audit.AuditRepository;
@@ -69,8 +68,7 @@ class NotificationServiceTest {
     }
 
     private static NotificationTtlConfig ttlConfig(Integer days, String environment) {
-        return new NotificationTtlConfig(days, environment, new NotificationTtlConfig.Sweep(
-            false, 3_600_000, 10, Duration.ofSeconds(1), Duration.ofSeconds(30)));
+        return new NotificationTtlConfig(days, environment);
     }
 
     private static NotificationAggregate stored(NotificationStatus status) {
@@ -511,36 +509,6 @@ class NotificationServiceTest {
         // Then
         verify(notificationRepository, never()).deleteAllByReferenceNumberIn(anyList());
         verify(auditRepository, never()).save(any());
-    }
-
-    @Test
-    void deleteExpired_shouldDeleteTheDueBatchAndReturnItsSize() {
-        // Given
-        when(notificationRepository.findExpired(any(Instant.class), any(PageRequest.class)))
-            .thenReturn(List.of(() -> REFERENCE, () -> "26-DEF456"));
-
-        // When
-        int deleted = notificationService.deleteExpired(10);
-
-        // Then
-        assertThat(deleted).isEqualTo(2);
-        verify(notificationRepository)
-            .deleteAllByReferenceNumberIn(List.of(REFERENCE, "26-DEF456"));
-        verify(auditRepository, never()).save(any());
-    }
-
-    @Test
-    void deleteExpired_shouldDeleteNothing_whenNoneAreDue() {
-        // Given
-        when(notificationRepository.findExpired(any(Instant.class), any(PageRequest.class)))
-            .thenReturn(List.of());
-
-        // When
-        int deleted = notificationService.deleteExpired(10);
-
-        // Then
-        assertThat(deleted).isZero();
-        verify(notificationRepository, never()).deleteAllByReferenceNumberIn(anyList());
     }
 
     @Test

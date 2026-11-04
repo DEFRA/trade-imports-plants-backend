@@ -52,11 +52,10 @@ public class NotificationAggregate {
     /**
      * When this notification becomes eligible for automatic expiry, anchored to {@code created}.
      * Set only for app-created notifications in non-prod environments (see
-     * {@code NotificationService.stampExpiry}); {@code null} in prod. Backed by a <em>plain</em>
-     * index (not a Mongo TTL index) so the expiry sweep runs as ordinary service code.
+     * {@code NotificationService.stampExpiry}); {@code null} in prod. Mongo removes the
+     * notification once this has passed.
      */
     @JsonIgnore
-    @Indexed
     private Instant expireAt;
 
     /** The typed notification content. Symmetric to {@link #fulfilments}. */
