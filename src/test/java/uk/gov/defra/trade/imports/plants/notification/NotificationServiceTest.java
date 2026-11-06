@@ -12,8 +12,9 @@ import static uk.gov.defra.trade.imports.plants.utils.LogCapture.logEventsDuring
 import static uk.gov.defra.trade.imports.plants.utils.LogCapture.messagesOf;
 
 import ch.qos.logback.classic.spi.ILoggingEvent;
-import java.time.Duration;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
@@ -63,6 +64,10 @@ class NotificationServiceTest {
     }
 
     private NotificationService newService(NotificationTtlConfig ttlConfig) {
+        return newService(ttlConfig, Clock.systemUTC());
+    }
+
+    private NotificationService newService(NotificationTtlConfig ttlConfig, Clock clock) {
         return new NotificationService(
             notificationRepository,
             auditRepository,
@@ -70,6 +75,7 @@ class NotificationServiceTest {
             notificationContentMapper,
             referenceNumberGenerator,
             ttlConfig,
+            clock,
             25,
             50);
     }
@@ -155,28 +161,22 @@ class NotificationServiceTest {
         assertThat(result.getExpireAt()).isEqualTo(result.getCreated().plus(7, ChronoUnit.DAYS));
     }
 
-    /**
-     * The expiry window is elapsed time, not wall-clock days. In a zone that observes daylight
-     * saving, seven wall-clock days across a clock change are an hour short or an hour long;
-     * seven days on an {@code Instant} are always 168 hours.
-     */
     @Test
-    void saveNotification_shouldStampExpireAtAnExactNumberOfElapsedDaysAfterCreated_whenJvmDefaultZoneObservesDst() {
-        // Given
+    void saveNotification_shouldStampExpireAtAnExactNumberOfElapsedDays_whenAClockChangeFallsInTheWindow() {
+        ZoneId zoneWithAClockChangeOn28March = ZoneId.of("Europe/London");
+        Clock threeDaysBeforeTheClockChange =
+            Clock.fixed(Instant.parse("2027-03-25T12:00:00Z"), zoneWithAClockChangeOn28March);
         TimeZone originalTimeZone = TimeZone.getDefault();
-        TimeZone.setDefault(TimeZone.getTimeZone("Europe/London"));
+        TimeZone.setDefault(TimeZone.getTimeZone(zoneWithAClockChangeOn28March));
         try {
-            notificationService = newService(ttlConfig(7, "dev"));
+            notificationService = newService(ttlConfig(7, "dev"), threeDaysBeforeTheClockChange);
             when(referenceNumberGenerator.generate()).thenReturn(REFERENCE);
             repositoryEchoesSaves();
 
-            // When
             NotificationAggregate result =
                 notificationService.saveNotification(NotificationDto.builder().build());
 
-            // Then
-            assertThat(Duration.between(result.getCreated(), result.getExpireAt()))
-                .isEqualTo(Duration.ofHours(7 * 24));
+            assertThat(result.getExpireAt()).isEqualTo(Instant.parse("2027-04-01T12:00:00Z"));
         } finally {
             TimeZone.setDefault(originalTimeZone);
         }

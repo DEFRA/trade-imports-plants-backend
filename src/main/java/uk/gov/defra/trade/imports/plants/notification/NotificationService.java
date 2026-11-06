@@ -1,6 +1,6 @@
 package uk.gov.defra.trade.imports.plants.notification;
 
-import java.time.Instant;
+import java.time.Clock;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Set;
@@ -44,6 +44,7 @@ public class NotificationService {
     private final NotificationContentMapper notificationContentMapper;
     private final ReferenceNumberGenerator referenceNumberGenerator;
     private final NotificationTtlConfig ttlConfig;
+    private final Clock clock;
     private final int listPageSize;
     private final int adminPageSize;
 
@@ -54,6 +55,7 @@ public class NotificationService {
         NotificationContentMapper notificationContentMapper,
         ReferenceNumberGenerator referenceNumberGenerator,
         NotificationTtlConfig ttlConfig,
+        Clock clock,
         @Value("${notification.list.page-size}") int listPageSize,
         @Value("${notification.admin.page-size}") int adminPageSize) {
         this.notificationRepository = notificationRepository;
@@ -62,6 +64,7 @@ public class NotificationService {
         this.notificationContentMapper = notificationContentMapper;
         this.referenceNumberGenerator = referenceNumberGenerator;
         this.ttlConfig = ttlConfig;
+        this.clock = clock;
         this.listPageSize = listPageSize;
         this.adminPageSize = adminPageSize;
     }
@@ -229,7 +232,7 @@ public class NotificationService {
         NotificationStatus targetStatus) {
         NotificationStatus previousStatus = notificationAggregate.getStatus();
         notificationAggregate.setStatus(targetStatus);
-        notificationAggregate.setUpdated(Instant.now());
+        notificationAggregate.setUpdated(clock.instant());
         NotificationAggregate saved = notificationRepository.save(notificationAggregate);
         if (previousStatus != targetStatus) {
             log.info("Notification {} status changed from {} to {}",
@@ -243,7 +246,7 @@ public class NotificationService {
             notificationAggregate.setSubmittedNotificationBaseline(null);
             notificationAggregate.setSubmittedFulfilmentsBaseline(null);
         }
-        notificationAggregate.setSubmittedAt(Instant.now());
+        notificationAggregate.setSubmittedAt(clock.instant());
     }
 
     /** Marks a notification DELETED, and returns one already DELETED unchanged. */
@@ -313,7 +316,7 @@ public class NotificationService {
 
     private NotificationAggregate createNotification(NotificationDto dto) {
         NotificationAggregate notificationAggregate = new NotificationAggregate();
-        notificationAggregate.setCreated(Instant.now());
+        notificationAggregate.setCreated(clock.instant());
         notificationAggregate.setStatus(NotificationStatus.DRAFT);
         stampExpiry(notificationAggregate);
         replaceFulfilmentsEnsuringNotification(dto, notificationAggregate);
@@ -358,7 +361,7 @@ public class NotificationService {
             .numberOfNotifications(referenceNumbers.size())
             .traceId(auditContext.traceId())
             .userId(auditContext.userId())
-            .timestamp(Instant.now())
+            .timestamp(clock.instant())
             .build();
 
         auditRepository.save(auditRecord);
