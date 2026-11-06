@@ -102,14 +102,11 @@ class NotificationServiceTest {
 
     @Test
     void saveNotification_shouldCreateDraftWithGeneratedReference_whenNoReferenceSupplied() {
-        // Given
         repositoryEchoesSaves();
 
-        // When
         NotificationAggregate result = notificationService.saveNotification(
             NotificationDto.builder().fulfilments(List.of(new Document("k", "v"))).build());
 
-        // Then
         assertThat(result.getReferenceNumber()).matches(ReferenceNumberGenerator.REFERENCE_NUMBER_PATTERN);
         assertThat(result.getStatus()).isEqualTo(NotificationStatus.DRAFT);
         assertThat(result.getCreated()).isNotNull();
@@ -121,11 +118,9 @@ class NotificationServiceTest {
         notificationService = newService(ttlConfig(NO_TTL_DAYS, "dev"));
         repositoryEchoesSaves();
 
-        // When
         NotificationAggregate result =
             notificationService.saveNotification(NotificationDto.builder().build());
 
-        // Then
         assertThat(result.getExpireAt()).isNull();
     }
 
@@ -134,25 +129,20 @@ class NotificationServiceTest {
         notificationService = newService(ttlConfig(7, "prod"));
         repositoryEchoesSaves();
 
-        // When
         NotificationAggregate result =
             notificationService.saveNotification(NotificationDto.builder().build());
 
-        // Then
         assertThat(result.getExpireAt()).isNull();
     }
 
     @Test
     void saveNotification_shouldStampExpireAtRelativeToCreated_whenNonProdAndTtlConfigured() {
-        // Given
         notificationService = newService(ttlConfig(7, "dev"));
         repositoryEchoesSaves();
 
-        // When
         NotificationAggregate result =
             notificationService.saveNotification(NotificationDto.builder().build());
 
-        // Then
         assertThat(result.getExpireAt()).isEqualTo(result.getCreated().plus(7, ChronoUnit.DAYS));
     }
 
@@ -204,11 +194,9 @@ class NotificationServiceTest {
 
     @Test
     void saveNotification_shouldLogEachAttemptWithNoPromiseOfARetry_whenAllPersistenceAttemptsCollide() {
-        // When
         List<ILoggingEvent> events = logEventsDuring(NotificationService.class,
             () -> saveWhoseThreeAttemptsCollide(new DuplicateKeyException("last collision")));
 
-        // Then
         assertThat(messagesOf(events)).containsExactly(
             "Reference number " + attemptedReferences.get(0) + " collided on persistence attempt 1/3",
             "Reference number " + attemptedReferences.get(1) + " collided on persistence attempt 2/3",
@@ -217,11 +205,9 @@ class NotificationServiceTest {
 
     @Test
     void saveNotification_shouldLogTheThrowableOfEachCollision_whenAllPersistenceAttemptsCollide() {
-        // When
         List<ILoggingEvent> events = logEventsDuring(NotificationService.class,
             () -> saveWhoseThreeAttemptsCollide(new DuplicateKeyException("last collision")));
 
-        // Then
         assertThat(events)
             .extracting(event -> event.getThrowableProxy().getMessage())
             .containsExactly("first collision", "second collision", "last collision");
@@ -229,31 +215,25 @@ class NotificationServiceTest {
 
     @Test
     void saveNotification_shouldKeepTheLastCollisionAsTheCause_whenAllPersistenceAttemptsCollide() {
-        // Given
         DuplicateKeyException lastCollision = new DuplicateKeyException("last collision");
 
-        // When
         Throwable thrown = saveWhoseThreeAttemptsCollide(lastCollision);
 
-        // Then
         assertThat(thrown).isInstanceOf(IllegalStateException.class).hasCauseReference(lastCollision);
     }
 
     @Test
     void saveNotification_shouldUpdateExistingDraft_whenReferenceSupplied() {
-        // Given
         when(notificationRepository.findByReferenceNumber(REFERENCE))
             .thenReturn(Optional.of(stored(NotificationStatus.DRAFT)));
         repositoryEchoesSaves();
 
-        // When
         NotificationAggregate result = notificationService.saveNotification(NotificationDto.builder()
             .referenceNumber(REFERENCE)
             .concurrencyToken(2L)
             .fulfilments(List.of(new Document("k", "updated")))
             .build());
 
-        // Then
         assertThat(result.getStatus()).isEqualTo(NotificationStatus.DRAFT);
         assertThat(result.getFulfilments()).containsExactly(new Document("k", "updated"));
         assertThat(result.getUpdated()).isNotNull();
@@ -261,11 +241,9 @@ class NotificationServiceTest {
 
     @Test
     void saveNotification_shouldThrowBadRequest_whenConcurrencyTokenMissingOnUpdate() {
-        // Given
         when(notificationRepository.findByReferenceNumber(REFERENCE))
             .thenReturn(Optional.of(stored(NotificationStatus.DRAFT)));
 
-        // When / Then
         assertThatThrownBy(() -> notificationService.saveNotification(
             NotificationDto.builder().referenceNumber(REFERENCE).build()))
             .isInstanceOf(BadRequestException.class)
@@ -274,11 +252,9 @@ class NotificationServiceTest {
 
     @Test
     void saveNotification_shouldThrowBadRequest_whenExistingIsSubmitted() {
-        // Given
         when(notificationRepository.findByReferenceNumber(REFERENCE))
             .thenReturn(Optional.of(stored(NotificationStatus.SUBMITTED)));
 
-        // When / Then
         assertThatThrownBy(() -> notificationService.saveNotification(NotificationDto.builder()
             .referenceNumber(REFERENCE).concurrencyToken(2L).build()))
             .isInstanceOf(BadRequestException.class)
@@ -287,10 +263,8 @@ class NotificationServiceTest {
 
     @Test
     void saveNotification_shouldThrowNotFound_whenReferenceDoesNotExist() {
-        // Given
         when(notificationRepository.findByReferenceNumber(REFERENCE)).thenReturn(Optional.empty());
 
-        // When / Then
         assertThatThrownBy(() -> notificationService.saveNotification(NotificationDto.builder()
             .referenceNumber(REFERENCE).concurrencyToken(2L).build()))
             .isInstanceOf(NotFoundException.class)
@@ -299,11 +273,9 @@ class NotificationServiceTest {
 
     @Test
     void replace_shouldThrowBadRequest_whenNotificationIsDeleted() {
-        // Given
         when(notificationRepository.findByReferenceNumber(REFERENCE))
             .thenReturn(Optional.of(stored(NotificationStatus.DELETED)));
 
-        // When / Then
         assertThatThrownBy(() -> notificationService.replace(REFERENCE,
             NotificationDto.builder().concurrencyToken(2L).build()))
             .isInstanceOf(BadRequestException.class)
@@ -312,32 +284,26 @@ class NotificationServiceTest {
 
     @Test
     void submitNotification_shouldStampSubmittedAt_whenSubmittingFromDraft() {
-        // Given
         when(notificationRepository.findByReferenceNumber(REFERENCE))
             .thenReturn(Optional.of(stored(NotificationStatus.DRAFT)));
         repositoryEchoesSaves();
 
-        // When
         NotificationAggregate result = notificationService.submitNotification(REFERENCE);
 
-        // Then
         assertThat(result.getStatus()).isEqualTo(NotificationStatus.SUBMITTED);
         assertThat(result.getSubmittedAt()).isNotNull();
     }
 
     @Test
     void submitNotification_shouldClearAmendBaselines_whenResubmittingFromAmend() {
-        // Given a notification mid-amendment
         NotificationAggregate amending = stored(NotificationStatus.AMEND);
         amending.setSubmittedNotificationBaseline(new Notification());
         amending.setSubmittedFulfilmentsBaseline(List.of(new Document("k", "before")));
         when(notificationRepository.findByReferenceNumber(REFERENCE)).thenReturn(Optional.of(amending));
         repositoryEchoesSaves();
 
-        // When
         NotificationAggregate result = notificationService.submitNotification(REFERENCE);
 
-        // Then
         assertThat(result.getStatus()).isEqualTo(NotificationStatus.SUBMITTED);
         assertThat(result.getSubmittedNotificationBaseline()).isNull();
         assertThat(result.getSubmittedFulfilmentsBaseline()).isNull();
@@ -345,11 +311,9 @@ class NotificationServiceTest {
 
     @Test
     void submitNotification_shouldThrowBadRequest_whenAlreadySubmitted() {
-        // Given
         when(notificationRepository.findByReferenceNumber(REFERENCE))
             .thenReturn(Optional.of(stored(NotificationStatus.SUBMITTED)));
 
-        // When / Then
         assertThatThrownBy(() -> notificationService.submitNotification(REFERENCE))
             .isInstanceOf(BadRequestException.class)
             .hasMessageContaining("Cannot submit notification with status: SUBMITTED");
@@ -357,17 +321,14 @@ class NotificationServiceTest {
 
     @Test
     void amendNotification_shouldSnapshotContentAndFulfilmentsAsTheRestorePoint() {
-        // Given
         NotificationAggregate submitted = stored(NotificationStatus.SUBMITTED);
         submitted.setFulfilments(List.of(new Document("k", "submitted")));
         Notification liveContent = submitted.getNotification();
         when(notificationRepository.findByReferenceNumber(REFERENCE)).thenReturn(Optional.of(submitted));
         repositoryEchoesSaves();
 
-        // When
         NotificationAggregate result = notificationService.amendNotification(REFERENCE);
 
-        // Then
         assertThat(result.getStatus()).isEqualTo(NotificationStatus.AMEND);
         assertThat(result.getSubmittedNotificationBaseline()).isEqualTo(liveContent);
         assertThat(result.getSubmittedFulfilmentsBaseline())
@@ -388,29 +349,24 @@ class NotificationServiceTest {
 
     @Test
     void amendNotification_shouldSnapshotFulfilmentsIndependently_soLaterEditsDoNotLeakIntoTheBaseline() {
-        // Given
         NotificationAggregate submitted = stored(NotificationStatus.SUBMITTED);
         Document live = new Document("answers", new Document("fieldOne", "VALUE_ONE"));
         submitted.setFulfilments(List.of(live));
         when(notificationRepository.findByReferenceNumber(REFERENCE)).thenReturn(Optional.of(submitted));
         repositoryEchoesSaves();
 
-        // When
         NotificationAggregate result = notificationService.amendNotification(REFERENCE);
         live.get("answers", Document.class).put("fieldOne", "Tulipa");
 
-        // Then
         assertThat(result.getSubmittedFulfilmentsBaseline().getFirst()
             .get("answers", Document.class)).containsEntry("fieldOne", "VALUE_ONE");
     }
 
     @Test
     void amendNotification_shouldThrowBadRequest_whenNotSubmitted() {
-        // Given
         when(notificationRepository.findByReferenceNumber(REFERENCE))
             .thenReturn(Optional.of(stored(NotificationStatus.DRAFT)));
 
-        // When / Then
         assertThatThrownBy(() -> notificationService.amendNotification(REFERENCE))
             .isInstanceOf(BadRequestException.class)
             .hasMessageContaining("Cannot amend notification with status: DRAFT");
@@ -418,7 +374,6 @@ class NotificationServiceTest {
 
     @Test
     void cancelAmendNotification_shouldRestoreTheBaselineAndPreserveSubmittedAt() {
-        // Given
         Instant originalSubmittedAt = Instant.now().minus(2, ChronoUnit.DAYS);
         NotificationAggregate amending = stored(NotificationStatus.AMEND);
         amending.setSubmittedAt(originalSubmittedAt);
@@ -430,10 +385,8 @@ class NotificationServiceTest {
         when(notificationRepository.findByReferenceNumber(REFERENCE)).thenReturn(Optional.of(amending));
         repositoryEchoesSaves();
 
-        // When
         NotificationAggregate result = notificationService.cancelAmendNotification(REFERENCE);
 
-        // Then
         assertThat(result.getStatus()).isEqualTo(NotificationStatus.SUBMITTED);
         assertThat(result.getNotification())
             .isEqualTo(baseline)
@@ -447,11 +400,9 @@ class NotificationServiceTest {
 
     @Test
     void cancelAmendNotification_shouldThrowBadRequest_whenNoBaselineStored() {
-        // Given
         when(notificationRepository.findByReferenceNumber(REFERENCE))
             .thenReturn(Optional.of(stored(NotificationStatus.AMEND)));
 
-        // When / Then
         assertThatThrownBy(() -> notificationService.cancelAmendNotification(REFERENCE))
             .isInstanceOf(BadRequestException.class)
             .hasMessageContaining("no submitted baseline stored");
@@ -459,11 +410,9 @@ class NotificationServiceTest {
 
     @Test
     void cancelAmendNotification_shouldThrowBadRequest_whenNotAmending() {
-        // Given
         when(notificationRepository.findByReferenceNumber(REFERENCE))
             .thenReturn(Optional.of(stored(NotificationStatus.SUBMITTED)));
 
-        // When / Then
         assertThatThrownBy(() -> notificationService.cancelAmendNotification(REFERENCE))
             .isInstanceOf(BadRequestException.class)
             .hasMessageContaining("Cannot cancel amendment for notification with status: SUBMITTED");
@@ -471,16 +420,13 @@ class NotificationServiceTest {
 
     @Test
     void copyNotification_shouldCreateAFreshDraftCarryingTheFulfilments() {
-        // Given
         NotificationAggregate source = stored(NotificationStatus.SUBMITTED);
         source.setFulfilments(List.of(new Document("k", "v")));
         when(notificationRepository.findByReferenceNumber(REFERENCE)).thenReturn(Optional.of(source));
         repositoryEchoesSaves();
 
-        // When
         NotificationAggregate result = notificationService.copyNotification(REFERENCE, 2L);
 
-        // Then
         assertThat(result.getReferenceNumber()).matches(ReferenceNumberGenerator.REFERENCE_NUMBER_PATTERN);
         assertThat(result.getStatus()).isEqualTo(NotificationStatus.DRAFT);
         assertThat(result.getFulfilments()).containsExactly(new Document("k", "v"));
@@ -488,11 +434,9 @@ class NotificationServiceTest {
 
     @Test
     void copyNotification_shouldThrowOptimisticLockingFailure_whenSourceHasAdvanced() {
-        // Given the caller's token is behind the stored one
         when(notificationRepository.findByReferenceNumber(REFERENCE))
             .thenReturn(Optional.of(stored(NotificationStatus.SUBMITTED)));
 
-        // When / Then
         assertThatThrownBy(() -> notificationService.copyNotification(REFERENCE, 1L))
             .isInstanceOf(OptimisticLockingFailureException.class)
             .hasMessageContaining("has advanced from expected concurrencyToken 1 to 2");
@@ -500,11 +444,9 @@ class NotificationServiceTest {
 
     @Test
     void copyNotification_shouldThrowBadRequest_whenSourceIsDeleted() {
-        // Given
         when(notificationRepository.findByReferenceNumber(REFERENCE))
             .thenReturn(Optional.of(stored(NotificationStatus.DELETED)));
 
-        // When / Then
         assertThatThrownBy(() -> notificationService.copyNotification(REFERENCE, 2L))
             .isInstanceOf(BadRequestException.class)
             .hasMessageContaining("Cannot copy notification with status: DELETED");
@@ -512,28 +454,22 @@ class NotificationServiceTest {
 
     @Test
     void softDeleteNotification_shouldTransitionToDeleted() {
-        // Given
         when(notificationRepository.findByReferenceNumber(REFERENCE))
             .thenReturn(Optional.of(stored(NotificationStatus.SUBMITTED)));
         repositoryEchoesSaves();
 
-        // When
         NotificationAggregate result = notificationService.softDeleteNotification(REFERENCE);
 
-        // Then
         assertThat(result.getStatus()).isEqualTo(NotificationStatus.DELETED);
     }
 
     @Test
     void softDeleteNotification_shouldBeIdempotent_whenAlreadyDeleted() {
-        // Given
         when(notificationRepository.findByReferenceNumber(REFERENCE))
             .thenReturn(Optional.of(stored(NotificationStatus.DELETED)));
 
-        // When
         NotificationAggregate result = notificationService.softDeleteNotification(REFERENCE);
 
-        // Then — no second write
         assertThat(result.getStatus()).isEqualTo(NotificationStatus.DELETED);
         verify(notificationRepository, never()).save(any());
     }
@@ -544,126 +480,100 @@ class NotificationServiceTest {
 
     @Test
     void softDeleteNotification_shouldLogTheReferenceAndNothingChanged_whenAlreadyDeleted() {
-        // Given
         when(notificationRepository.findByReferenceNumber(REFERENCE))
             .thenReturn(Optional.of(stored(NotificationStatus.DELETED)));
 
-        // When
         List<String> messages = messagesLoggedDuring(() -> notificationService.softDeleteNotification(REFERENCE));
 
-        // Then
         assertThat(messages).containsExactly("Notification 26-ABC123 is already DELETED, nothing changed");
     }
 
     @Test
     void softDeleteNotification_shouldLogTheStatusChange() {
-        // Given
         when(notificationRepository.findByReferenceNumber(REFERENCE))
             .thenReturn(Optional.of(stored(NotificationStatus.DRAFT)));
         repositoryEchoesSaves();
 
-        // When
         List<String> messages = messagesLoggedDuring(() -> notificationService.softDeleteNotification(REFERENCE));
 
-        // Then
         assertThat(messages).containsExactly("Notification 26-ABC123 status changed from DRAFT to DELETED");
     }
 
     @Test
     void submitNotification_shouldLogTheStatusChange() {
-        // Given
         when(notificationRepository.findByReferenceNumber(REFERENCE))
             .thenReturn(Optional.of(stored(NotificationStatus.AMEND)));
         repositoryEchoesSaves();
 
-        // When
         List<String> messages = messagesLoggedDuring(() -> notificationService.submitNotification(REFERENCE));
 
-        // Then
         assertThat(messages).containsExactly("Notification 26-ABC123 status changed from AMEND to SUBMITTED");
     }
 
     @Test
     void amendNotification_shouldLogTheStatusChange() {
-        // Given
         NotificationAggregate submitted = stored(NotificationStatus.SUBMITTED);
         submitted.setFulfilments(List.of(new Document("k", "submitted")));
         when(notificationRepository.findByReferenceNumber(REFERENCE)).thenReturn(Optional.of(submitted));
         repositoryEchoesSaves();
 
-        // When
         List<String> messages = messagesLoggedDuring(() -> notificationService.amendNotification(REFERENCE));
 
-        // Then
         assertThat(messages).containsExactly("Notification 26-ABC123 status changed from SUBMITTED to AMEND");
     }
 
     @Test
     void cancelAmendNotification_shouldLogTheStatusChange() {
-        // Given
         NotificationAggregate amending = stored(NotificationStatus.AMEND);
         amending.setSubmittedNotificationBaseline(new Notification());
         amending.setSubmittedFulfilmentsBaseline(List.of(new Document("k", "submitted")));
         when(notificationRepository.findByReferenceNumber(REFERENCE)).thenReturn(Optional.of(amending));
         repositoryEchoesSaves();
 
-        // When
         List<String> messages = messagesLoggedDuring(() -> notificationService.cancelAmendNotification(REFERENCE));
 
-        // Then
         assertThat(messages).containsExactly("Notification 26-ABC123 status changed from AMEND to SUBMITTED");
     }
 
     @Test
     void replace_shouldLogOnlyTheUpdate_whenTheStatusStaysTheSame() {
-        // Given
         when(notificationRepository.findByReferenceNumber(REFERENCE))
             .thenReturn(Optional.of(stored(NotificationStatus.DRAFT)));
         repositoryEchoesSaves();
 
-        // When
         List<String> messages = messagesLoggedDuring(() -> notificationService.replace(REFERENCE,
             NotificationDto.builder().concurrencyToken(2L).build()));
 
-        // Then
         assertThat(messages).containsExactly("Updating notification 26-ABC123");
     }
 
     @Test
     void logExpiryStamping_shouldGiveDaysAndEnvironment_whenStampingIsOn() {
-        // When
         List<String> messages = messagesLoggedDuring(newService(ttlConfig(7, "dev"))::logExpiryStamping);
 
-        // Then
         assertThat(messages).containsExactly("Notification expiry stamping is on: 7 days in environment dev");
     }
 
     @Test
     void logExpiryStamping_shouldNameProdAsTheReason_whenDaysAreSetInProd() {
-        // When
         List<String> messages = messagesLoggedDuring(newService(ttlConfig(7, "prod"))::logExpiryStamping);
 
-        // Then
         assertThat(messages).containsExactly("Notification expiry stamping is off: environment prod is prod");
     }
 
     @Test
     void logExpiryStamping_shouldNameMissingDaysAsTheReason_whenNoDaysAreSetOutsideProd() {
-        // When
         List<String> messages = messagesLoggedDuring(newService(ttlConfig(NO_TTL_DAYS, "dev"))::logExpiryStamping);
 
-        // Then
         assertThat(messages).containsExactly("Notification expiry stamping is off: no days set in environment dev");
     }
 
     @Test
     void logExpiryStamping_shouldListenForTheApplicationBeingReady() throws NoSuchMethodException {
-        // When
         EventListener listener = NotificationService.class
             .getMethod("logExpiryStamping")
             .getAnnotation(EventListener.class);
 
-        // Then
         assertThat(listener.value()).containsExactly(ApplicationReadyEvent.class);
     }
 
@@ -741,21 +651,17 @@ class NotificationServiceTest {
 
     @Test
     void deleteByReferenceNumbers_shouldBeANoOp_whenGivenAnEmptyList() {
-        // When
         notificationService.deleteByReferenceNumbers(List.of(), AUDIT_CONTEXT);
 
-        // Then
         verify(notificationRepository, never()).deleteAllByReferenceNumberIn(anyList());
         verify(auditRepository, never()).save(any());
     }
 
     @Test
     void findFulfilmentsView_shouldThrowNotFound_whenReferenceDoesNotExist() {
-        // Given
         when(notificationRepository.findFulfilmentsViewByReferenceNumber(REFERENCE))
             .thenReturn(Optional.empty());
 
-        // When / Then
         assertThatThrownBy(() -> notificationService.findFulfilmentsView(REFERENCE))
             .isInstanceOf(NotFoundException.class)
             .hasMessageContaining(REFERENCE);
