@@ -92,7 +92,7 @@ public class NotificationService {
         }
         notificationAggregate.setConcurrencyToken(dto.getConcurrencyToken());
         setNotificationDetails(dto, notificationAggregate);
-        return write(notificationAggregate, notificationAggregate.getStatus(), false);
+        return saveWithStatus(notificationAggregate, notificationAggregate.getStatus());
     }
 
     /** Creates a new DRAFT copied from an existing notification. Backs {@code POST /notifications/{ref}/copy}. */
@@ -168,7 +168,8 @@ public class NotificationService {
                 "Cannot submit notification with status: " + notificationAggregate.getStatus());
         }
 
-        return write(notificationAggregate, NotificationStatus.SUBMITTED, true);
+        applySubmission(notificationAggregate);
+        return saveWithStatus(notificationAggregate, NotificationStatus.SUBMITTED);
     }
 
     /** SUBMITTED to AMEND, snapshotting the current content and fulfilments as the restore point. */
@@ -186,7 +187,7 @@ public class NotificationService {
         notificationAggregate.setSubmittedFulfilmentsBaseline(
             Fulfilments.deepCopy(notificationAggregate.getFulfilments()));
 
-        return write(notificationAggregate, NotificationStatus.AMEND, false);
+        return saveWithStatus(notificationAggregate, NotificationStatus.AMEND);
     }
 
     /** AMEND back to SUBMITTED, restoring the snapshot taken when the amendment started. */
@@ -209,32 +210,22 @@ public class NotificationService {
         notificationAggregate.setFulfilments(
             Fulfilments.deepCopy(notificationAggregate.getSubmittedFulfilmentsBaseline()));
         notificationAggregate.setSubmittedFulfilmentsBaseline(null);
-        return write(notificationAggregate, NotificationStatus.SUBMITTED, false);
+        return saveWithStatus(notificationAggregate, NotificationStatus.SUBMITTED);
     }
 
-    /**
-     * Applies a status transition and persists. Submitting out of AMEND discards the amend
-     * baselines; only an actual submission stamps {@code submittedAt}, so a cancel-amend that
-     * lands back on SUBMITTED keeps the original submission timestamp.
-     *
-     * @param notification   the aggregate to persist
-     * @param targetStatus   the status to move to
-     * @param isSubmission   whether this write is a submission (and so mints a new {@code submittedAt})
-     * @return the persisted aggregate, with its incremented concurrency token
-     */
-    private NotificationAggregate write(NotificationAggregate notification,
-        NotificationStatus targetStatus, boolean isSubmission) {
-        if (targetStatus == NotificationStatus.SUBMITTED
-            && notification.getStatus() == NotificationStatus.AMEND) {
-            notification.setSubmittedNotificationBaseline(null);
-            notification.setSubmittedFulfilmentsBaseline(null);
+    private NotificationAggregate saveWithStatus(NotificationAggregate notificationAggregate,
+        NotificationStatus targetStatus) {
+        notificationAggregate.setStatus(targetStatus);
+        notificationAggregate.setUpdated(Instant.now());
+        return notificationRepository.save(notificationAggregate);
+    }
+
+    private void applySubmission(NotificationAggregate notificationAggregate) {
+        if (notificationAggregate.getStatus() == NotificationStatus.AMEND) {
+            notificationAggregate.setSubmittedNotificationBaseline(null);
+            notificationAggregate.setSubmittedFulfilmentsBaseline(null);
         }
-        notification.setStatus(targetStatus);
-        notification.setUpdated(Instant.now());
-        if (isSubmission) {
-            notification.setSubmittedAt(Instant.now());
-        }
-        return notificationRepository.save(notification);
+        notificationAggregate.setSubmittedAt(Instant.now());
     }
 
     /** Marks a notification DELETED. Idempotent per REST DELETE convention. */
@@ -250,7 +241,7 @@ public class NotificationService {
             throw new BadRequestException(
                 "Cannot delete notification with status: " + notificationAggregate.getStatus());
         }
-        return write(notificationAggregate, NotificationStatus.DELETED, false);
+        return saveWithStatus(notificationAggregate, NotificationStatus.DELETED);
     }
 
     public ReferenceNumberPageResponse findAllReferenceNumbers(int page) {
@@ -311,7 +302,7 @@ public class NotificationService {
             notificationAggregate.setReferenceNumber(referenceNumberGenerator.generate());
             try {
                 NotificationAggregate saved =
-                    write(notificationAggregate, NotificationStatus.DRAFT, false);
+                    saveWithStatus(notificationAggregate, NotificationStatus.DRAFT);
                 log.info("Notification saved with reference number: {}", saved.getReferenceNumber());
                 return saved;
             } catch (DuplicateKeyException _) {
@@ -337,7 +328,7 @@ public class NotificationService {
         existing.setConcurrencyToken(dto.getConcurrencyToken());
         log.info("Updating notification {}", referenceNumber);
         setNotificationDetails(dto, existing);
-        return write(existing, existing.getStatus(), false);
+        return saveWithStatus(existing, existing.getStatus());
     }
 
     private NotificationAggregate requireByReferenceNumber(String referenceNumber) {
