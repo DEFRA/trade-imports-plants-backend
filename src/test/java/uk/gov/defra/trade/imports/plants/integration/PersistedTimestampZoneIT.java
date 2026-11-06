@@ -72,13 +72,11 @@ class PersistedTimestampZoneIT extends IntegrationBase {
 
     @Test
     void application_shouldPinTheJvmDefaultZoneToUtc() {
-        // When / Then
         assertThat(originalTimeZone.getID()).isEqualTo("UTC");
     }
 
     @Test
     void save_shouldStoreNotificationTimestampsAsTheInstantTheyName_whenJvmDefaultZoneIsBst() {
-        // Given — an aggregate carrying all four top-level timestamps
         NotificationAggregate aggregate = NotificationAggregate.builder()
             .referenceNumber(REF)
             .status(NotificationStatus.SUBMITTED)
@@ -88,10 +86,8 @@ class PersistedTimestampZoneIT extends IntegrationBase {
             .expireAt(EXPIRE_AT)
             .build();
 
-        // When
         notificationRepository.save(aggregate);
 
-        // Then
         Document stored = storedNotification();
         assertThat(stored).isNotNull();
         assertThat(stored.get("created", Date.class).toInstant()).isEqualTo(CREATED);
@@ -103,7 +99,6 @@ class PersistedTimestampZoneIT extends IntegrationBase {
 
     @Test
     void save_shouldStoreTheAuditTimestampAsTheInstantItNames_whenJvmDefaultZoneIsBst() {
-        // Given — an audit row stamped mid-BST
         Audit audit = Audit.builder()
             .action(Action.DELETE_NOTIFICATIONS)
             .result(Result.SUCCESS)
@@ -111,10 +106,8 @@ class PersistedTimestampZoneIT extends IntegrationBase {
             .numberOfNotifications(1)
             .build();
 
-        // When
         auditRepository.save(audit);
 
-        // Then
         Document stored = mongoTemplate.getCollection("audit").find().first();
         assertThat(stored).isNotNull();
         assertThat(stored.get("timestamp", Date.class).toInstant()).isEqualTo(AUDIT_TIMESTAMP);
@@ -122,7 +115,6 @@ class PersistedTimestampZoneIT extends IntegrationBase {
 
     @Test
     void findByReferenceNumber_shouldReadBackEveryTimestamp_whenTheDocumentHoldsRawBsonDates() {
-        // Given
         mongoTemplate.getCollection(NOTIFICATION_COLLECTION).insertOne(new Document()
             .append("referenceNumber", REF)
             .append("status", NotificationStatus.SUBMITTED.name())
@@ -131,10 +123,8 @@ class PersistedTimestampZoneIT extends IntegrationBase {
             .append("submittedAt", Date.from(SUBMITTED_AT))
             .append("expireAt", Date.from(EXPIRE_AT)));
 
-        // When
         NotificationAggregate read = notificationRepository.findByReferenceNumber(REF).orElseThrow();
 
-        // Then — every field comes back as the instant the stored BSON date names
         assertThat(read.getCreated()).isEqualTo(CREATED);
         assertThat(read.getUpdated()).isEqualTo(SUBMITTED_AT);
         assertThat(read.getSubmittedAt()).isEqualTo(SUBMITTED_AT);
@@ -143,7 +133,6 @@ class PersistedTimestampZoneIT extends IntegrationBase {
 
     @Test
     void findAll_shouldOrderByTheStoredInstant_whenSortedByCreatedAt() {
-        // Given — two notifications saved newest-first, so insertion order cannot flatter the sort
         notificationRepository.save(NotificationAggregate.builder()
             .referenceNumber("GBN-HRP-26-TZ0002")
             .status(NotificationStatus.DRAFT)
@@ -155,13 +144,11 @@ class PersistedTimestampZoneIT extends IntegrationBase {
             .created(Instant.parse("2026-01-01T10:00:00Z"))
             .build());
 
-        // When
         var ascending = notificationRepository.findAll(
             PageRequest.of(0, 10, NotificationSort.toSort("createdAt,asc")));
         var descending = notificationRepository.findAll(
             PageRequest.of(0, 10, NotificationSort.toSort("createdAt,desc")));
 
-        // Then
         assertThat(ascending.getContent())
             .extracting(NotificationAggregate::getReferenceNumber)
             .containsExactly("GBN-HRP-26-TZ0003", "GBN-HRP-26-TZ0002");
@@ -172,10 +159,8 @@ class PersistedTimestampZoneIT extends IntegrationBase {
 
     @Test
     void save_shouldStoreACalendarDateAsAnIsoDateString_whenJvmDefaultZoneIsBst() {
-        // Given / When — a date-only property saved under the BST zone pinned in setUp
         mongoTemplate.save(new DateProbe("probe-1", ARRIVAL_DATE));
 
-        // Then
         Document stored = mongoTemplate.getCollection(DATE_PROBE_COLLECTION).find().first();
         assertThat(stored).isNotNull();
         assertThat(stored.get("arrivalDate", String.class)).isEqualTo("2026-07-21");
@@ -184,22 +169,18 @@ class PersistedTimestampZoneIT extends IntegrationBase {
     @ParameterizedTest
     @ValueSource(strings = {"UTC", "Europe/London", "America/New_York", "Australia/Sydney"})
     void findById_shouldReadBackTheSameCalendarDate_whateverTheJvmDefaultZone(String zoneId) {
-        // Given — a document written by a UTC JVM
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
         mongoTemplate.save(new DateProbe("probe-1", ARRIVAL_DATE));
 
-        // When — it is read by a JVM in another zone
         TimeZone.setDefault(TimeZone.getTimeZone(zoneId));
         DateProbe read = mongoTemplate.findById("probe-1", DateProbe.class);
 
-        // Then
         assertThat(read).isNotNull();
         assertThat(read.getArrivalDate()).isEqualTo(ARRIVAL_DATE);
     }
 
     @Test
     void read_shouldLeaveADateShapedStringInFulfilmentsAsAString() {
-        // Given
         String dateShaped = "2026-07-21";
         notificationRepository.save(NotificationAggregate.builder()
             .referenceNumber(REF)
@@ -208,10 +189,8 @@ class PersistedTimestampZoneIT extends IntegrationBase {
             .fulfilments(List.of(new Document("arrivalDate", dateShaped)))
             .build());
 
-        // When
         NotificationAggregate read = notificationRepository.findByReferenceNumber(REF).orElseThrow();
 
-        // Then
         assertThat(read.getFulfilments().getFirst()).containsEntry("arrivalDate", dateShaped);
         assertThat(storedNotification().getList("fulfilments", Document.class).getFirst()
             .get("arrivalDate", String.class)).isEqualTo(dateShaped);
