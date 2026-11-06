@@ -466,7 +466,7 @@ class NotificationServiceTest {
     @Test
     void deleteByReferenceNumbers_shouldDeleteAllAndAuditSuccess_whenEveryReferenceExists() {
         // Given
-        when(notificationRepository.findAllByReferenceNumberIn(List.of(REFERENCE)))
+        when(notificationRepository.findAllReferencesByReferenceNumberIn(List.of(REFERENCE)))
             .thenReturn(List.of(() -> REFERENCE));
 
         // When
@@ -486,7 +486,7 @@ class NotificationServiceTest {
     @Test
     void deleteByReferenceNumbers_shouldDeleteNothingAndAuditFailure_whenAnyReferenceIsMissing() {
         // Given only one of the two references exists
-        when(notificationRepository.findAllByReferenceNumberIn(List.of(REFERENCE, "26-MSSNG1")))
+        when(notificationRepository.findAllReferencesByReferenceNumberIn(List.of(REFERENCE, "26-MSSNG1")))
             .thenReturn(List.of(() -> REFERENCE));
 
         // When / Then
