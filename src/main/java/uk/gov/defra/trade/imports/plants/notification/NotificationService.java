@@ -209,8 +209,6 @@ public class NotificationService {
         notificationAggregate.setFulfilments(
             Fulfilments.deepCopy(notificationAggregate.getSubmittedFulfilmentsBaseline()));
         notificationAggregate.setSubmittedFulfilmentsBaseline(null);
-        // submittedAt is deliberately NOT reset — reverting to the previously-submitted state
-        // preserves the original submission timestamp.
         return write(notificationAggregate, NotificationStatus.SUBMITTED, false);
     }
 
@@ -243,7 +241,6 @@ public class NotificationService {
     @Transactional
     public NotificationAggregate softDeleteNotification(String referenceNumber) {
         NotificationAggregate notificationAggregate = requireByReferenceNumber(referenceNumber);
-        // Idempotent per REST DELETE convention — a repeat call after a lost response is a no-op.
         if (notificationAggregate.getStatus() == NotificationStatus.DELETED) {
             return notificationAggregate;
         }
