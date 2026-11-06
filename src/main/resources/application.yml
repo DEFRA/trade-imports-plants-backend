@@ -110,9 +110,6 @@ notification:
     page-size: 50
   list:
     page-size: 25
-  # Automatic expiry of app-created notifications in non-prod environments.
-  # Defaults here are the prod-safe values: days unset (no stamping) and expiry disabled (no TTL
-  # index). Non-prod environments opt in via NOTIFICATION_TTL_DAYS and NOTIFICATION_TTL_EXPIRY_ENABLED.
   ttl:
     days: ${NOTIFICATION_TTL_DAYS:}
     environment: ${ENVIRONMENT:local}

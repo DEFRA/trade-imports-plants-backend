@@ -38,12 +38,6 @@ public class NotificationAggregate {
 
     private Instant submittedAt;
 
-    /**
-     * When this notification becomes eligible for automatic expiry, anchored to {@code created}.
-     * Set only for app-created notifications in non-prod environments (see
-     * {@code NotificationService.stampExpiry}); {@code null} in prod. Mongo removes the
-     * notification once this has passed.
-     */
     @JsonIgnore
     private Instant expireAt;
 
