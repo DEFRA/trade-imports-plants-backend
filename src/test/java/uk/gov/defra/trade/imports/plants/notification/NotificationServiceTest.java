@@ -2,12 +2,16 @@ package uk.gov.defra.trade.imports.plants.notification;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static uk.gov.defra.trade.imports.plants.utils.LogCapture.logEventsDuring;
+import static uk.gov.defra.trade.imports.plants.utils.LogCapture.messagesOf;
 
+import ch.qos.logback.classic.spi.ILoggingEvent;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -21,6 +25,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import uk.gov.defra.trade.imports.plants.audit.Action;
 import uk.gov.defra.trade.imports.plants.audit.Audit;
@@ -173,6 +178,30 @@ class NotificationServiceTest {
         } finally {
             TimeZone.setDefault(originalTimeZone);
         }
+    }
+
+    private Throwable saveWhoseThreeAttemptsCollide(DuplicateKeyException lastCollision) {
+        when(referenceNumberGenerator.generate()).thenReturn("26-ABC001", "26-ABC002", "26-ABC003");
+        when(notificationRepository.save(any(NotificationAggregate.class)))
+            .thenThrow(new DuplicateKeyException("first collision"))
+            .thenThrow(new DuplicateKeyException("second collision"))
+            .thenThrow(lastCollision);
+        NotificationDto dto = NotificationDto.builder().build();
+
+        return catchThrowable(() -> notificationService.saveNotification(dto));
+    }
+
+    @Test
+    void saveNotification_shouldLogEachAttemptWithNoPromiseOfARetry_whenAllPersistenceAttemptsCollide() {
+        // When
+        List<ILoggingEvent> events = logEventsDuring(NotificationService.class,
+            () -> saveWhoseThreeAttemptsCollide(new DuplicateKeyException("last collision")));
+
+        // Then
+        assertThat(messagesOf(events)).containsExactly(
+            "Reference number collision on persistence attempt 1/3",
+            "Reference number collision on persistence attempt 2/3",
+            "Reference number collision on persistence attempt 3/3");
     }
 
     @Test
