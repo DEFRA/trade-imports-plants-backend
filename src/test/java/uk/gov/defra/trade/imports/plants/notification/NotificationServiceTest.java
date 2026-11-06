@@ -45,6 +45,7 @@ import uk.gov.defra.trade.imports.plants.exceptions.NotFoundException;
 class NotificationServiceTest {
 
     private static final String REFERENCE = "26-ABC123";
+    private static final Integer NO_TTL_DAYS = null;
     private static final AuditContext AUDIT_CONTEXT = new AuditContext("trace-1", "user-1");
 
     @Mock
@@ -59,7 +60,7 @@ class NotificationServiceTest {
 
     @BeforeEach
     void setUp() {
-        notificationService = newService(ttlConfig(null, "local"));
+        notificationService = newService(ttlConfig(NO_TTL_DAYS, "local"));
     }
 
     private NotificationService newService(NotificationTtlConfig ttlConfig) {
@@ -117,7 +118,7 @@ class NotificationServiceTest {
 
     @Test
     void saveNotification_shouldNotStampExpireAt_whenNoTtlConfigured() {
-        // Given the prod-safe default: no TTL days configured
+        notificationService = newService(ttlConfig(NO_TTL_DAYS, "dev"));
         repositoryEchoesSaves();
 
         // When
@@ -130,7 +131,6 @@ class NotificationServiceTest {
 
     @Test
     void saveNotification_shouldNotStampExpireAt_whenEnvironmentIsProd() {
-        // Given TTL days set but the environment is prod — the second independent safeguard
         notificationService = newService(ttlConfig(7, "prod"));
         repositoryEchoesSaves();
 
@@ -650,7 +650,7 @@ class NotificationServiceTest {
     @Test
     void logExpiryStamping_shouldNameMissingDaysAsTheReason_whenNoDaysAreSetOutsideProd() {
         // When
-        List<String> messages = messagesLoggedDuring(newService(ttlConfig(null, "dev"))::logExpiryStamping);
+        List<String> messages = messagesLoggedDuring(newService(ttlConfig(NO_TTL_DAYS, "dev"))::logExpiryStamping);
 
         // Then
         assertThat(messages).containsExactly("Notification expiry stamping is off: no days set in environment dev");
