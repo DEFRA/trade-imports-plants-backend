@@ -74,11 +74,7 @@ public class NotificationService {
         return updateNotification(notificationDto);
     }
 
-    /**
-     * Replace the notification content at the given reference. Backs {@code PUT /notifications/{ref}}.
-     * Requires DRAFT or AMEND — the state-transition entrypoints (submit / amend / cancelAmend /
-     * softDelete) handle other cases.
-     */
+    /** Replaces the content of a DRAFT or AMEND notification, and refuses any other status. */
     @Transactional
     public NotificationAggregate replace(String referenceNumber, NotificationDto dto) {
         NotificationAggregate notificationAggregate = requireByReferenceNumber(referenceNumber);
@@ -95,7 +91,7 @@ public class NotificationService {
         return saveWithStatus(notificationAggregate, notificationAggregate.getStatus());
     }
 
-    /** Creates a new DRAFT copied from an existing notification. Backs {@code POST /notifications/{ref}/copy}. */
+    /** Creates a new DRAFT copied from an existing notification. */
     @Transactional
     public NotificationAggregate copyNotification(String referenceNumber, Long expectedConcurrencyToken) {
         NotificationAggregate source = requireByReferenceNumber(referenceNumber);
@@ -123,14 +119,12 @@ public class NotificationService {
         return findAll(page, sort, null);
     }
 
-    /** Serves {@code GET /notifications/{ref}/fulfilments} — the frontend engine's rehydrate read. */
     public NotificationFulfilmentsView findFulfilmentsView(String referenceNumber) {
         return notificationRepository.findFulfilmentsViewByReferenceNumber(referenceNumber)
             .orElseThrow(() -> new NotFoundException(
                 CANNOT_FIND_NOTIFICATION_WITH_REFERENCE_NUMBER + referenceNumber));
     }
 
-    /** Serves {@code GET /notifications?…} for the dashboard list. */
     public NotificationPageResponse findAll(int page, String sort, String referenceNumber) {
         List<NotificationStatus> dashboardStatuses = List.of(
             NotificationStatus.DRAFT, NotificationStatus.SUBMITTED, NotificationStatus.AMEND);
@@ -228,7 +222,7 @@ public class NotificationService {
         notificationAggregate.setSubmittedAt(Instant.now());
     }
 
-    /** Marks a notification DELETED. Idempotent per REST DELETE convention. */
+    /** Marks a notification DELETED, and returns one already DELETED unchanged. */
     @Transactional
     public NotificationAggregate softDeleteNotification(String referenceNumber) {
         NotificationAggregate notificationAggregate = requireByReferenceNumber(referenceNumber);
