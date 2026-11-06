@@ -62,7 +62,7 @@ class NotificationExpiryIT extends IntegrationBase {
   }
 
   @Test
-  void replacePlainExpireAtIndexWithTtlIndex_replacesAPlainExpireAtIndexWithTheTtlIndex() {
+  void replacePlainExpireAtIndexWithTtlIndex_shouldLeaveOnlyTheTtlIndex_whenAPlainIndexExists() {
     mongoTemplate.indexOps(NotificationAggregate.class).dropIndex(TTL_INDEX);
     mongoTemplate.indexOps(NotificationAggregate.class)
         .createIndex(new Index().on("expireAt", Sort.Direction.ASC));
@@ -92,7 +92,7 @@ class NotificationExpiryIT extends IntegrationBase {
   }
 
   @Test
-  void expiredNotifications_areRemovedByMongoWhileUndatedAndUnexpiredOnesStay() {
+  void expiredNotifications_shouldBeRemovedByMongo_whileUndatedAndUnexpiredOnesStay() {
     String expiredReference = "26-EXP001";
     String undatedReference = "26-UND001";
     String unexpiredReference = "26-ACT001";
