@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.List;
 import java.util.TimeZone;
@@ -33,11 +32,9 @@ import uk.gov.defra.trade.imports.plants.notification.NotificationStatus;
 class PersistedTimestampZoneIT extends IntegrationBase {
 
     private static final Instant CREATED = Instant.parse("2026-07-21T00:30:00Z");
-    private static final Instant UPDATED = Instant.parse("2026-07-22T23:45:10.123456Z");
-    private static final Instant UPDATED_AT_BSON_MILLISECOND_PRECISION = UPDATED.truncatedTo(ChronoUnit.MILLIS);
+    private static final Instant UPDATED_AT_BSON_MILLISECOND_PRECISION = Instant.parse("2026-07-22T23:45:10.123Z");
     private static final Instant SUBMITTED_AT = Instant.parse("2026-07-22T23:45:10Z");
     private static final Instant EXPIRE_AT = Instant.parse("2026-08-21T00:30:00Z");
-    private static final Instant AUDIT_TIMESTAMP = Instant.parse("2026-07-23T00:15:00Z");
 
     private static final LocalDate ARRIVAL_DATE = LocalDate.parse("2026-07-21");
 
@@ -81,7 +78,7 @@ class PersistedTimestampZoneIT extends IntegrationBase {
             .referenceNumber(REF)
             .status(NotificationStatus.SUBMITTED)
             .created(CREATED)
-            .updated(UPDATED)
+            .updated(Instant.parse("2026-07-22T23:45:10.123456Z"))
             .submittedAt(SUBMITTED_AT)
             .expireAt(EXPIRE_AT)
             .build();
@@ -99,10 +96,11 @@ class PersistedTimestampZoneIT extends IntegrationBase {
 
     @Test
     void save_shouldStoreTheAuditTimestampAsTheInstantItNames_whenJvmDefaultZoneIsBst() {
+        Instant auditTimestamp = Instant.parse("2026-07-23T00:15:00Z");
         Audit audit = Audit.builder()
             .action(Action.DELETE_NOTIFICATIONS)
             .result(Result.SUCCESS)
-            .timestamp(AUDIT_TIMESTAMP)
+            .timestamp(auditTimestamp)
             .numberOfNotifications(1)
             .build();
 
@@ -110,7 +108,7 @@ class PersistedTimestampZoneIT extends IntegrationBase {
 
         Document stored = mongoTemplate.getCollection("audit").find().first();
         assertThat(stored).isNotNull();
-        assertThat(stored.get("timestamp", Date.class).toInstant()).isEqualTo(AUDIT_TIMESTAMP);
+        assertThat(stored.get("timestamp", Date.class).toInstant()).isEqualTo(auditTimestamp);
     }
 
     @Test
