@@ -60,10 +60,8 @@ class NotificationExpiryIT extends IntegrationBase {
 
   @Test
   void ttlIndex_isOnExpireAtAndExpiresNotificationsAtThatTime() {
-    // When
     List<Document> indexes = expireAtIndexes();
 
-    // Then
     assertThat(indexes).singleElement().satisfies(index -> {
       assertThat(index.getString("name")).isEqualTo(TTL_INDEX);
       assertThat(index.get("expireAfterSeconds", Number.class).longValue()).isZero();
@@ -72,15 +70,12 @@ class NotificationExpiryIT extends IntegrationBase {
 
   @Test
   void replacePlainExpireAtIndexWithTtlIndex_replacesAPlainExpireAtIndexWithTheTtlIndex() {
-    // Given
     mongoTemplate.indexOps(NotificationAggregate.class).dropIndex(TTL_INDEX);
     mongoTemplate.indexOps(NotificationAggregate.class)
         .createIndex(new Index().on("expireAt", Sort.Direction.ASC));
 
-    // When
     notificationExpiryIndex.replacePlainExpireAtIndexWithTtlIndex();
 
-    // Then
     assertThat(expireAtIndexes()).singleElement().satisfies(index -> {
       assertThat(index.getString("name")).isEqualTo(TTL_INDEX);
       assertThat(index.get("expireAfterSeconds", Number.class).longValue()).isZero();
@@ -105,15 +100,12 @@ class NotificationExpiryIT extends IntegrationBase {
 
   @Test
   void expiredNotifications_areRemovedByMongoWhileUndatedAndUnexpiredOnesStay() {
-    // Given
     String expired = save("26-EXP001", Instant.now().minus(1, ChronoUnit.HOURS));
     String undated = save("26-UND001", null);
     String unexpired = save("26-ACT001", Instant.now().plus(7, ChronoUnit.DAYS));
 
-    // When
     setTtlMonitorSleepSecs(1);
 
-    // Then
     await()
         .atMost(Duration.ofSeconds(30))
         .untilAsserted(
