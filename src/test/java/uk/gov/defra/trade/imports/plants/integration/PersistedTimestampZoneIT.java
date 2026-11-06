@@ -119,14 +119,14 @@ class PersistedTimestampZoneIT extends IntegrationBase {
             .append("referenceNumber", REF)
             .append("status", NotificationStatus.SUBMITTED.name())
             .append("created", Date.from(CREATED))
-            .append("updated", Date.from(SUBMITTED_AT))
+            .append("updated", Date.from(UPDATED_AT_BSON_MILLISECOND_PRECISION))
             .append("submittedAt", Date.from(SUBMITTED_AT))
             .append("expireAt", Date.from(EXPIRE_AT)));
 
         NotificationAggregate read = notificationRepository.findByReferenceNumber(REF).orElseThrow();
 
         assertThat(read.getCreated()).isEqualTo(CREATED);
-        assertThat(read.getUpdated()).isEqualTo(SUBMITTED_AT);
+        assertThat(read.getUpdated()).isEqualTo(UPDATED_AT_BSON_MILLISECOND_PRECISION);
         assertThat(read.getSubmittedAt()).isEqualTo(SUBMITTED_AT);
         assertThat(read.getExpireAt()).isEqualTo(EXPIRE_AT);
     }
