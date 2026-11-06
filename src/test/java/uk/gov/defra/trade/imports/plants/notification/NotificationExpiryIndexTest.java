@@ -2,6 +2,7 @@ package uk.gov.defra.trade.imports.plants.notification;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -58,17 +59,18 @@ class NotificationExpiryIndexTest {
   }
 
   @Test
-  void replacePlainExpireAtIndexWithTtlIndex_inProdTouchesNoIndexEvenWhenExpiryIsEnabled() {
-    // Given
-    MongoTemplate mongoTemplate = mock(MongoTemplate.class);
-    NotificationExpiryIndex expiryIndex =
-        new NotificationExpiryIndex(mongoTemplate, new NotificationTtlConfig(7, "prod"));
+  void replacePlainExpireAtIndexWithTtlIndex_shouldTouchNoIndex_whenExpiryIsEnabledInProd() {
+    contextRunner
+        .withPropertyValues(
+            "notification.ttl.expiry.enabled=true", "notification.ttl.environment=prod")
+        .run(context -> {
+          MongoTemplate mongoTemplate = context.getBean(MongoTemplate.class);
+          clearInvocations(mongoTemplate);
 
-    // When
-    expiryIndex.replacePlainExpireAtIndexWithTtlIndex();
+          context.getBean(NotificationExpiryIndex.class).replacePlainExpireAtIndexWithTtlIndex();
 
-    // Then
-    verifyNoInteractions(mongoTemplate);
+          verifyNoInteractions(mongoTemplate);
+        });
   }
 
   @Test
