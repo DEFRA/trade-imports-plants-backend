@@ -32,7 +32,11 @@ import uk.gov.defra.trade.imports.plants.notification.NotificationRepository;
 import uk.gov.defra.trade.imports.plants.notification.NotificationStatus;
 
 @TestPropertySource(
-    properties = {"notification.ttl.days=7", "notification.ttl.expiry.enabled=true"})
+    properties = {
+        "notification.ttl.days=7",
+        "notification.ttl.expiry.enabled=true",
+        "spring.data.mongodb.database=notification-expiry-it"
+    })
 class NotificationExpiryIT extends IntegrationBase {
 
   private static final String TTL_INDEX = "notification_expire_at_ttl";
@@ -50,10 +54,7 @@ class NotificationExpiryIT extends IntegrationBase {
   }
 
   @AfterEach
-  void restoreSharedMongo() {
-    expireAtIndexes().forEach(
-        index -> mongoTemplate.indexOps(NotificationAggregate.class)
-            .dropIndex(index.getString("name")));
+  void restoreTtlMonitorSleep() {
     setTtlMonitorSleepSecs(60);
   }
 
