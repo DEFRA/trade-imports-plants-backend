@@ -204,9 +204,9 @@ class NotificationControllerTest {
     }
 
     @Test
-    void findAll_shouldReturnThePaginationEnvelope() throws Exception {
+    void findDashboardPage_shouldReturnThePaginationEnvelope() throws Exception {
         // Given
-        when(notificationService.findAll(1, null, null)).thenReturn(new NotificationPageResponse(
+        when(notificationService.findDashboardPage(1, null, null)).thenReturn(new NotificationPageResponse(
             List.of(new NotificationView.Data(
                 REFERENCE, 1L, NotificationStatus.SUBMITTED, Instant.now(), SUBMITTED_AT)),
             1, 25, 1, 1L, 1));
@@ -222,12 +222,12 @@ class NotificationControllerTest {
     }
 
     @Test
-    void findAll_shouldReturn400_whenPageIsBelowOne() throws Exception {
+    void findDashboardPage_shouldReturn400_whenPageIsBelowOne() throws Exception {
         // When / Then
         mockMvc.perform(get("/notifications").param("page", "0"))
             .andExpect(status().isBadRequest());
 
-        verify(notificationService, never()).findAll(anyInt(), any(), any());
+        verify(notificationService, never()).findDashboardPage(anyInt(), any(), any());
     }
 
     @Test

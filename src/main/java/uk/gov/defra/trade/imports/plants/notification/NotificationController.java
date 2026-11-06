@@ -143,12 +143,12 @@ public class NotificationController {
     @ApiResponse(responseCode = "200", description = "Paginated notifications returned",
         content = @Content(schema = @Schema(implementation = NotificationPageResponse.class)))
     @Timed("controller.getAllNotifications.time")
-    public NotificationPageResponse findAll(
+    public NotificationPageResponse findDashboardPage(
         @RequestParam(defaultValue = "1") @Min(1) int page,
         @RequestParam(required = false) String sort,
         @RequestParam(required = false) String referenceNumber) {
         log.debug("GET /notifications?page={}&sort={}&referenceNumber={}", page, sort, referenceNumber);
-        return notificationService.findAll(page, sort, referenceNumber);
+        return notificationService.findDashboardPage(page, sort, referenceNumber);
     }
 
     @GetMapping("/{referenceNumber}/fulfilments")
