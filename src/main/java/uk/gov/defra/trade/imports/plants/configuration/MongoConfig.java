@@ -57,7 +57,7 @@ public class MongoConfig {
       if (sslEnabled) {
           SSLContext sslContext = trustStoreConfiguration.customSslContext();
           builder.applyToSslSettings(bdr -> bdr.context(sslContext));
-          log.info("MongoDB SSL configured with SSL Bundle");
+          log.info("MongoDB SSL configured with the trust store SSL context");
       }
       log.info("MongoDB client configuration complete");
       
