@@ -70,8 +70,6 @@ logging:
     javax.management.remote.rmi: WARN
 
 # Actuator endpoints
-# Production: Only health endpoint exposed (secure by default)
-# Development: Use dev profile (application-local.yml) for debugging endpoints
 management:
   endpoints:
     web:
