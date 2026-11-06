@@ -201,9 +201,33 @@ class NotificationServiceTest {
 
         // Then
         assertThat(messagesOf(events)).containsExactly(
-            "Reference number collision on persistence attempt 1/3",
-            "Reference number collision on persistence attempt 2/3",
-            "Reference number collision on persistence attempt 3/3");
+            "Reference number 26-ABC001 collided on persistence attempt 1/3",
+            "Reference number 26-ABC002 collided on persistence attempt 2/3",
+            "Reference number 26-ABC003 collided on persistence attempt 3/3");
+    }
+
+    @Test
+    void saveNotification_shouldLogTheThrowableOfEachCollision_whenAllPersistenceAttemptsCollide() {
+        // When
+        List<ILoggingEvent> events = logEventsDuring(NotificationService.class,
+            () -> saveWhoseThreeAttemptsCollide(new DuplicateKeyException("last collision")));
+
+        // Then
+        assertThat(events)
+            .extracting(event -> event.getThrowableProxy().getMessage())
+            .containsExactly("first collision", "second collision", "last collision");
+    }
+
+    @Test
+    void saveNotification_shouldKeepTheLastCollisionAsTheCause_whenAllPersistenceAttemptsCollide() {
+        // Given
+        DuplicateKeyException lastCollision = new DuplicateKeyException("last collision");
+
+        // When
+        Throwable thrown = saveWhoseThreeAttemptsCollide(lastCollision);
+
+        // Then
+        assertThat(thrown).isInstanceOf(IllegalStateException.class).hasCauseReference(lastCollision);
     }
 
     @Test

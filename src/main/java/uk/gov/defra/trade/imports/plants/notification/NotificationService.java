@@ -318,6 +318,7 @@ public class NotificationService {
         stampExpiry(notificationAggregate);
         replaceFulfilmentsEnsuringNotification(dto, notificationAggregate);
         int maxAttempts = 3;
+        DuplicateKeyException lastCollision = null;
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             notificationAggregate.setReferenceNumber(referenceNumberGenerator.generate());
             try {
@@ -325,12 +326,14 @@ public class NotificationService {
                     saveWithStatus(notificationAggregate, NotificationStatus.DRAFT);
                 log.info("Notification saved with reference number: {}", saved.getReferenceNumber());
                 return saved;
-            } catch (DuplicateKeyException _) {
-                log.warn("Reference number collision on persistence attempt {}/{}", attempt, maxAttempts);
+            } catch (DuplicateKeyException collision) {
+                log.warn("Reference number {} collided on persistence attempt {}/{}",
+                    notificationAggregate.getReferenceNumber(), attempt, maxAttempts, collision);
+                lastCollision = collision;
             }
         }
         throw new IllegalStateException(
-            "Failed to generate a unique reference number after " + maxAttempts + " attempts");
+            "Failed to generate a unique reference number after " + maxAttempts + " attempts", lastCollision);
     }
 
     private NotificationAggregate requireByReferenceNumber(String referenceNumber) {
