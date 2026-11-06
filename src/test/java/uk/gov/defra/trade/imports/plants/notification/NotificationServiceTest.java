@@ -16,6 +16,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.TimeZone;
@@ -23,8 +24,10 @@ import org.bson.Document;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mapstruct.factory.Mappers;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.invocation.InvocationOnMock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
@@ -50,11 +53,7 @@ class NotificationServiceTest {
     @Mock
     private AuditRepository auditRepository;
 
-    @Mock
-    private NotificationContentMapper notificationContentMapper;
-
-    @Mock
-    private ReferenceNumberGenerator referenceNumberGenerator;
+    private final List<String> attemptedReferences = new ArrayList<>();
 
     private NotificationService notificationService;
 
@@ -72,8 +71,8 @@ class NotificationServiceTest {
             notificationRepository,
             auditRepository,
             new NotificationCopyMapper(),
-            notificationContentMapper,
-            referenceNumberGenerator,
+            Mappers.getMapper(NotificationContentMapper.class),
+            new ReferenceNumberGenerator(),
             ttlConfig,
             clock,
             25,
@@ -103,7 +102,6 @@ class NotificationServiceTest {
     @Test
     void saveNotification_shouldCreateDraftWithGeneratedReference_whenNoReferenceSupplied() {
         // Given
-        when(referenceNumberGenerator.generate()).thenReturn(REFERENCE);
         repositoryEchoesSaves();
 
         // When
@@ -111,7 +109,7 @@ class NotificationServiceTest {
             NotificationDto.builder().fulfilments(List.of(new Document("k", "v"))).build());
 
         // Then
-        assertThat(result.getReferenceNumber()).isEqualTo(REFERENCE);
+        assertThat(result.getReferenceNumber()).matches(ReferenceNumberGenerator.REFERENCE_NUMBER_PATTERN);
         assertThat(result.getStatus()).isEqualTo(NotificationStatus.DRAFT);
         assertThat(result.getCreated()).isNotNull();
         assertThat(result.getFulfilments()).containsExactly(new Document("k", "v"));
@@ -120,7 +118,6 @@ class NotificationServiceTest {
     @Test
     void saveNotification_shouldNotStampExpireAt_whenNoTtlConfigured() {
         // Given the prod-safe default: no TTL days configured
-        when(referenceNumberGenerator.generate()).thenReturn(REFERENCE);
         repositoryEchoesSaves();
 
         // When
@@ -135,7 +132,6 @@ class NotificationServiceTest {
     void saveNotification_shouldNotStampExpireAt_whenEnvironmentIsProd() {
         // Given TTL days set but the environment is prod — the second independent safeguard
         notificationService = newService(ttlConfig(7, "prod"));
-        when(referenceNumberGenerator.generate()).thenReturn(REFERENCE);
         repositoryEchoesSaves();
 
         // When
@@ -150,7 +146,6 @@ class NotificationServiceTest {
     void saveNotification_shouldStampExpireAtRelativeToCreated_whenNonProdAndTtlConfigured() {
         // Given
         notificationService = newService(ttlConfig(7, "dev"));
-        when(referenceNumberGenerator.generate()).thenReturn(REFERENCE);
         repositoryEchoesSaves();
 
         // When
@@ -170,7 +165,6 @@ class NotificationServiceTest {
         TimeZone.setDefault(TimeZone.getTimeZone(zoneWithAClockChangeOn28March));
         try {
             notificationService = newService(ttlConfig(7, "dev"), threeDaysBeforeTheClockChange);
-            when(referenceNumberGenerator.generate()).thenReturn(REFERENCE);
             repositoryEchoesSaves();
 
             NotificationAggregate result =
@@ -183,14 +177,29 @@ class NotificationServiceTest {
     }
 
     private Throwable saveWhoseThreeAttemptsCollide(DuplicateKeyException lastCollision) {
-        when(referenceNumberGenerator.generate()).thenReturn("26-ABC001", "26-ABC002", "26-ABC003");
         when(notificationRepository.save(any(NotificationAggregate.class)))
-            .thenThrow(new DuplicateKeyException("first collision"))
-            .thenThrow(new DuplicateKeyException("second collision"))
-            .thenThrow(lastCollision);
+            .thenAnswer(attempt -> recordReferenceThenThrow(attempt, new DuplicateKeyException("first collision")))
+            .thenAnswer(attempt -> recordReferenceThenThrow(attempt, new DuplicateKeyException("second collision")))
+            .thenAnswer(attempt -> recordReferenceThenThrow(attempt, lastCollision));
         NotificationDto dto = NotificationDto.builder().build();
 
         return catchThrowable(() -> notificationService.saveNotification(dto));
+    }
+
+    private NotificationAggregate recordReferenceThenThrow(InvocationOnMock attempt, DuplicateKeyException collision) {
+        NotificationAggregate attempted = attempt.getArgument(0);
+        attemptedReferences.add(attempted.getReferenceNumber());
+        throw collision;
+    }
+
+    @Test
+    void saveNotification_shouldGenerateAFreshReferenceForEachAttempt_whenAllPersistenceAttemptsCollide() {
+        saveWhoseThreeAttemptsCollide(new DuplicateKeyException("last collision"));
+
+        assertThat(attemptedReferences)
+            .hasSize(3)
+            .doesNotHaveDuplicates()
+            .allMatch(reference -> reference.matches(ReferenceNumberGenerator.REFERENCE_NUMBER_PATTERN));
     }
 
     @Test
@@ -201,9 +210,9 @@ class NotificationServiceTest {
 
         // Then
         assertThat(messagesOf(events)).containsExactly(
-            "Reference number 26-ABC001 collided on persistence attempt 1/3",
-            "Reference number 26-ABC002 collided on persistence attempt 2/3",
-            "Reference number 26-ABC003 collided on persistence attempt 3/3");
+            "Reference number " + attemptedReferences.get(0) + " collided on persistence attempt 1/3",
+            "Reference number " + attemptedReferences.get(1) + " collided on persistence attempt 2/3",
+            "Reference number " + attemptedReferences.get(2) + " collided on persistence attempt 3/3");
     }
 
     @Test
@@ -351,9 +360,8 @@ class NotificationServiceTest {
         // Given
         NotificationAggregate submitted = stored(NotificationStatus.SUBMITTED);
         submitted.setFulfilments(List.of(new Document("k", "submitted")));
-        Notification clone = new Notification();
+        Notification liveContent = submitted.getNotification();
         when(notificationRepository.findByReferenceNumber(REFERENCE)).thenReturn(Optional.of(submitted));
-        when(notificationContentMapper.deepClone(submitted.getNotification())).thenReturn(clone);
         repositoryEchoesSaves();
 
         // When
@@ -361,9 +369,21 @@ class NotificationServiceTest {
 
         // Then
         assertThat(result.getStatus()).isEqualTo(NotificationStatus.AMEND);
-        assertThat(result.getSubmittedNotificationBaseline()).isSameAs(clone);
+        assertThat(result.getSubmittedNotificationBaseline()).isEqualTo(liveContent);
         assertThat(result.getSubmittedFulfilmentsBaseline())
             .containsExactly(new Document("k", "submitted"));
+    }
+
+    @Test
+    void amendNotification_shouldSnapshotContentIndependentlyOfTheLiveContent() {
+        NotificationAggregate submitted = stored(NotificationStatus.SUBMITTED);
+        Notification liveContent = submitted.getNotification();
+        when(notificationRepository.findByReferenceNumber(REFERENCE)).thenReturn(Optional.of(submitted));
+        repositoryEchoesSaves();
+
+        NotificationAggregate result = notificationService.amendNotification(REFERENCE);
+
+        assertThat(result.getSubmittedNotificationBaseline()).isNotNull().isNotSameAs(liveContent);
     }
 
     @Test
@@ -373,7 +393,6 @@ class NotificationServiceTest {
         Document live = new Document("answers", new Document("fieldOne", "VALUE_ONE"));
         submitted.setFulfilments(List.of(live));
         when(notificationRepository.findByReferenceNumber(REFERENCE)).thenReturn(Optional.of(submitted));
-        when(notificationContentMapper.deepClone(any())).thenReturn(new Notification());
         repositoryEchoesSaves();
 
         // When
@@ -404,12 +423,11 @@ class NotificationServiceTest {
         NotificationAggregate amending = stored(NotificationStatus.AMEND);
         amending.setSubmittedAt(originalSubmittedAt);
         amending.setFulfilments(List.of(new Document("k", "edited")));
+        Notification editedContent = amending.getNotification();
         Notification baseline = new Notification();
         amending.setSubmittedNotificationBaseline(baseline);
         amending.setSubmittedFulfilmentsBaseline(List.of(new Document("k", "submitted")));
-        Notification restored = new Notification();
         when(notificationRepository.findByReferenceNumber(REFERENCE)).thenReturn(Optional.of(amending));
-        when(notificationContentMapper.deepClone(baseline)).thenReturn(restored);
         repositoryEchoesSaves();
 
         // When
@@ -417,7 +435,10 @@ class NotificationServiceTest {
 
         // Then
         assertThat(result.getStatus()).isEqualTo(NotificationStatus.SUBMITTED);
-        assertThat(result.getNotification()).isSameAs(restored);
+        assertThat(result.getNotification())
+            .isEqualTo(baseline)
+            .isNotSameAs(baseline)
+            .isNotSameAs(editedContent);
         assertThat(result.getFulfilments()).containsExactly(new Document("k", "submitted"));
         assertThat(result.getSubmittedNotificationBaseline()).isNull();
         assertThat(result.getSubmittedFulfilmentsBaseline()).isNull();
@@ -454,14 +475,13 @@ class NotificationServiceTest {
         NotificationAggregate source = stored(NotificationStatus.SUBMITTED);
         source.setFulfilments(List.of(new Document("k", "v")));
         when(notificationRepository.findByReferenceNumber(REFERENCE)).thenReturn(Optional.of(source));
-        when(referenceNumberGenerator.generate()).thenReturn("26-XYZ789");
         repositoryEchoesSaves();
 
         // When
         NotificationAggregate result = notificationService.copyNotification(REFERENCE, 2L);
 
         // Then
-        assertThat(result.getReferenceNumber()).isEqualTo("26-XYZ789");
+        assertThat(result.getReferenceNumber()).matches(ReferenceNumberGenerator.REFERENCE_NUMBER_PATTERN);
         assertThat(result.getStatus()).isEqualTo(NotificationStatus.DRAFT);
         assertThat(result.getFulfilments()).containsExactly(new Document("k", "v"));
     }
@@ -569,7 +589,6 @@ class NotificationServiceTest {
         NotificationAggregate submitted = stored(NotificationStatus.SUBMITTED);
         submitted.setFulfilments(List.of(new Document("k", "submitted")));
         when(notificationRepository.findByReferenceNumber(REFERENCE)).thenReturn(Optional.of(submitted));
-        when(notificationContentMapper.deepClone(any())).thenReturn(new Notification());
         repositoryEchoesSaves();
 
         // When
@@ -586,7 +605,6 @@ class NotificationServiceTest {
         amending.setSubmittedNotificationBaseline(new Notification());
         amending.setSubmittedFulfilmentsBaseline(List.of(new Document("k", "submitted")));
         when(notificationRepository.findByReferenceNumber(REFERENCE)).thenReturn(Optional.of(amending));
-        when(notificationContentMapper.deepClone(any())).thenReturn(new Notification());
         repositoryEchoesSaves();
 
         // When
