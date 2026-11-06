@@ -1,14 +1,14 @@
 package uk.gov.defra.trade.imports.plants.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static uk.gov.defra.trade.imports.plants.integration.ExpireAtIndexes.expireAtIndexes;
 
-import java.util.ArrayList;
+import java.util.List;
 import org.bson.Document;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.test.context.TestPropertySource;
-import uk.gov.defra.trade.imports.plants.notification.NotificationAggregate;
 
 @TestPropertySource(properties = "spring.data.mongodb.database=notification-expiry-disabled-it")
 class NotificationExpiryDisabledIT extends IntegrationBase {
@@ -17,12 +17,8 @@ class NotificationExpiryDisabledIT extends IntegrationBase {
 
   @Test
   void startup_shouldLeaveNotificationsWithNoIndexOnExpireAt_whenExpiryIsUnconfigured() {
-    var indexedKeys =
-        mongoTemplate.getCollection(mongoTemplate.getCollectionName(NotificationAggregate.class))
-            .listIndexes().into(new ArrayList<>()).stream()
-            .map(index -> index.get("key", Document.class))
-            .toList();
+    List<Document> indexes = expireAtIndexes(mongoTemplate);
 
-    assertThat(indexedKeys).isNotEmpty().noneMatch(key -> key.containsKey("expireAt"));
+    assertThat(indexes).isEmpty();
   }
 }
