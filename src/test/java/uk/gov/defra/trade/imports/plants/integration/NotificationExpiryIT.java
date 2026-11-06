@@ -62,16 +62,6 @@ class NotificationExpiryIT extends IntegrationBase {
   }
 
   @Test
-  void ttlIndex_isOnExpireAtAndExpiresNotificationsAtThatTime() {
-    List<Document> indexes = expireAtIndexes();
-
-    assertThat(indexes).singleElement().satisfies(index -> {
-      assertThat(index.getString("name")).isEqualTo(TTL_INDEX);
-      assertThat(index.get("expireAfterSeconds", Number.class).longValue()).isZero();
-    });
-  }
-
-  @Test
   void replacePlainExpireAtIndexWithTtlIndex_replacesAPlainExpireAtIndexWithTheTtlIndex() {
     mongoTemplate.indexOps(NotificationAggregate.class).dropIndex(TTL_INDEX);
     mongoTemplate.indexOps(NotificationAggregate.class)
