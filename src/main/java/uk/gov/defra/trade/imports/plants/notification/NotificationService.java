@@ -70,12 +70,16 @@ public class NotificationService {
         if (referenceNumber == null || referenceNumber.isBlank()) {
             return createNotification(notificationDto);
         }
-        return updateNotification(notificationDto);
+        return replaceContent(referenceNumber, notificationDto);
     }
 
     /** Replaces the content of a DRAFT or AMEND notification, and refuses any other status. */
     @Transactional
     public NotificationAggregate replace(String referenceNumber, NotificationDto dto) {
+        return replaceContent(referenceNumber, dto);
+    }
+
+    private NotificationAggregate replaceContent(String referenceNumber, NotificationDto dto) {
         NotificationAggregate notificationAggregate = requireByReferenceNumber(referenceNumber);
         if (notificationAggregate.getStatus() != NotificationStatus.DRAFT
             && notificationAggregate.getStatus() != NotificationStatus.AMEND) {
@@ -86,6 +90,7 @@ public class NotificationService {
             throw new BadRequestException("concurrencyToken is required to replace a notification");
         }
         notificationAggregate.setConcurrencyToken(dto.getConcurrencyToken());
+        log.info("Updating notification {}", referenceNumber);
         replaceFulfilmentsEnsuringNotification(dto, notificationAggregate);
         return saveWithStatus(notificationAggregate, notificationAggregate.getStatus());
     }
@@ -301,23 +306,6 @@ public class NotificationService {
         }
         throw new IllegalStateException(
             "Failed to generate a unique reference number after " + maxAttempts + " attempts");
-    }
-
-    private NotificationAggregate updateNotification(NotificationDto dto) {
-        String referenceNumber = dto.getReferenceNumber();
-        NotificationAggregate existing = requireByReferenceNumber(referenceNumber);
-        if (existing.getStatus() != NotificationStatus.DRAFT
-            && existing.getStatus() != NotificationStatus.AMEND) {
-            throw new BadRequestException(
-                "Cannot save notification with status: " + existing.getStatus());
-        }
-        if (dto.getConcurrencyToken() == null) {
-            throw new BadRequestException("concurrencyToken is required to update a notification");
-        }
-        existing.setConcurrencyToken(dto.getConcurrencyToken());
-        log.info("Updating notification {}", referenceNumber);
-        replaceFulfilmentsEnsuringNotification(dto, existing);
-        return saveWithStatus(existing, existing.getStatus());
     }
 
     private NotificationAggregate requireByReferenceNumber(String referenceNumber) {

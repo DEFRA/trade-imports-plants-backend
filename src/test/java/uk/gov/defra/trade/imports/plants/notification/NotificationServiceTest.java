@@ -247,7 +247,7 @@ class NotificationServiceTest {
         assertThatThrownBy(() -> notificationService.saveNotification(NotificationDto.builder()
             .referenceNumber(REFERENCE).concurrencyToken(2L).build()))
             .isInstanceOf(BadRequestException.class)
-            .hasMessageContaining("Cannot save notification with status: SUBMITTED");
+            .hasMessageContaining("Cannot replace notification content with status: SUBMITTED");
     }
 
     @Test
