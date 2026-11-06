@@ -103,18 +103,21 @@ class NotificationExpiryIT extends IntegrationBase {
 
   @Test
   void expiredNotifications_areRemovedByMongoWhileUndatedAndUnexpiredOnesStay() {
-    String expired = save("26-EXP001", Instant.now().minus(1, ChronoUnit.HOURS));
-    String undated = save("26-UND001", null);
-    String unexpired = save("26-ACT001", Instant.now().plus(7, ChronoUnit.DAYS));
+    String expiredReference = "26-EXP001";
+    String undatedReference = "26-UND001";
+    String unexpiredReference = "26-ACT001";
+    saveNotification(expiredReference, Instant.now().minus(1, ChronoUnit.HOURS));
+    saveNotification(undatedReference, null);
+    saveNotification(unexpiredReference, Instant.now().plus(7, ChronoUnit.DAYS));
 
     setTtlMonitorSleepSecs(1);
 
     await()
         .atMost(Duration.ofSeconds(30))
-        .untilAsserted(
-            () -> assertThat(notificationRepository.findByReferenceNumber(expired)).isEmpty());
-    assertThat(notificationRepository.findByReferenceNumber(undated)).isPresent();
-    assertThat(notificationRepository.findByReferenceNumber(unexpired)).isPresent();
+        .untilAsserted(() ->
+            assertThat(notificationRepository.findByReferenceNumber(expiredReference)).isEmpty());
+    assertThat(notificationRepository.findByReferenceNumber(undatedReference)).isPresent();
+    assertThat(notificationRepository.findByReferenceNumber(unexpiredReference)).isPresent();
   }
 
   private MongoTemplate templateOvertakenAfterListingIndexes() {
@@ -131,13 +134,12 @@ class NotificationExpiryIT extends IntegrationBase {
     return overtakenTemplate;
   }
 
-  private String save(String referenceNumber, Instant expireAt) {
+  private void saveNotification(String referenceNumber, Instant expireAt) {
     notificationRepository.save(NotificationAggregate.builder()
         .referenceNumber(referenceNumber)
         .status(NotificationStatus.DRAFT)
         .expireAt(expireAt)
         .build());
-    return referenceNumber;
   }
 
   private List<Document> expireAtIndexes() {
