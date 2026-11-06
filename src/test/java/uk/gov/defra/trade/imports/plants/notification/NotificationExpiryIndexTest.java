@@ -44,14 +44,14 @@ class NotificationExpiryIndexTest {
   }
 
   @Test
-  void createIndex_inProdTouchesNoIndexEvenWhenExpiryIsEnabled() {
+  void replacePlainExpireAtIndexWithTtlIndex_inProdTouchesNoIndexEvenWhenExpiryIsEnabled() {
     // Given
     MongoTemplate mongoTemplate = mock(MongoTemplate.class);
     NotificationExpiryIndex expiryIndex =
         new NotificationExpiryIndex(mongoTemplate, new NotificationTtlConfig(7, "prod"));
 
     // When
-    expiryIndex.createIndex();
+    expiryIndex.replacePlainExpireAtIndexWithTtlIndex();
 
     // Then
     verifyNoInteractions(mongoTemplate);

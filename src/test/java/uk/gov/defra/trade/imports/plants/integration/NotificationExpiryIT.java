@@ -38,7 +38,7 @@ class NotificationExpiryIT extends IntegrationBase {
   @BeforeEach
   void ensureTtlIndex() {
     notificationRepository.deleteAll();
-    notificationExpiryIndex.createIndex();
+    notificationExpiryIndex.replacePlainExpireAtIndexWithTtlIndex();
   }
 
   @AfterEach
@@ -62,14 +62,14 @@ class NotificationExpiryIT extends IntegrationBase {
   }
 
   @Test
-  void createIndex_replacesAPlainExpireAtIndexWithTheTtlIndex() {
+  void replacePlainExpireAtIndexWithTtlIndex_replacesAPlainExpireAtIndexWithTheTtlIndex() {
     // Given
     mongoTemplate.indexOps(NotificationAggregate.class).dropIndex(TTL_INDEX);
     mongoTemplate.indexOps(NotificationAggregate.class)
         .createIndex(new Index().on("expireAt", Sort.Direction.ASC));
 
     // When
-    notificationExpiryIndex.createIndex();
+    notificationExpiryIndex.replacePlainExpireAtIndexWithTtlIndex();
 
     // Then
     assertThat(expireAtIndexes()).singleElement().satisfies(index -> {

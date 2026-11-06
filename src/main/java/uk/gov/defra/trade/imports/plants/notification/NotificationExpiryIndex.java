@@ -17,9 +17,9 @@ import org.springframework.stereotype.Component;
 import uk.gov.defra.trade.imports.plants.configuration.NotificationTtlConfig;
 
 /**
- * Once the application is ready, creates the Mongo TTL index that removes notifications when their
- * {@code expireAt} has passed, dropping any plain index on {@code expireAt} first. Exists only when
- * {@code notification.ttl.expiry.enabled=true}, and creates nothing in prod.
+ * Once the application is ready, puts in place the Mongo TTL index that removes notifications when
+ * their {@code expireAt} has passed. Exists only when {@code notification.ttl.expiry.enabled=true},
+ * and touches no index in prod.
  */
 @Component
 @Slf4j
@@ -34,7 +34,7 @@ public class NotificationExpiryIndex {
   private final NotificationTtlConfig ttlConfig;
 
   @EventListener(ApplicationReadyEvent.class)
-  public void createIndex() {
+  public void replacePlainExpireAtIndexWithTtlIndex() {
     if (ttlConfig.isProd()) {
       log.warn("Notification expiry is enabled in prod; refusing to create the TTL index");
       return;
