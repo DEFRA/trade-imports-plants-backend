@@ -670,6 +670,20 @@ class NotificationServiceTest {
     }
 
     @Test
+    void deleteByReferenceNumbers_shouldLogTheCountAndReferenceNumbers_whenEveryReferenceExists() {
+        // Given
+        when(notificationRepository.findAllReferencesByReferenceNumberIn(List.of(REFERENCE)))
+            .thenReturn(List.of(() -> REFERENCE));
+
+        // When
+        List<String> messages = messagesLoggedDuring(
+            () -> notificationService.deleteByReferenceNumbers(List.of(REFERENCE), AUDIT_CONTEXT));
+
+        // Then
+        assertThat(messages).containsExactly("Deleting 1 notifications: [26-ABC123]");
+    }
+
+    @Test
     void deleteByReferenceNumbers_shouldDeleteNothingAndAuditFailure_whenAnyReferenceIsMissing() {
         // Given only one of the two references exists
         when(notificationRepository.findAllReferencesByReferenceNumberIn(List.of(REFERENCE, "26-MSSNG1")))
