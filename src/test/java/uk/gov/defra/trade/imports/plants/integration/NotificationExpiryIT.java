@@ -48,8 +48,12 @@ class NotificationExpiryIT extends IntegrationBase {
   @Autowired private NotificationExpiryIndex notificationExpiryIndex;
 
   @BeforeEach
-  void ensureTtlIndex() {
+  void deleteAllNotifications() {
     notificationRepository.deleteAll();
+  }
+
+  @BeforeEach
+  void putTtlIndexInPlace() {
     notificationExpiryIndex.replacePlainExpireAtIndexWithTtlIndex();
   }
 
