@@ -14,7 +14,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.data.mongodb.MongoDatabaseFactory;
 import org.springframework.data.mongodb.MongoTransactionManager;
 import org.springframework.data.mongodb.core.convert.MongoCustomConversions;
-import org.springframework.scheduling.annotation.EnableScheduling;
 import javax.net.ssl.SSLContext;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -32,7 +31,6 @@ import uk.gov.defra.trade.imports.plants.configuration.tls.TrustStoreConfigurati
  * mongodb://host:port/database?authMechanism=MONGODB-AWS&authSource=$external
  */
 @Configuration
-@EnableScheduling
 @Slf4j
 public class MongoConfig {
 
