@@ -87,7 +87,7 @@ public class NotificationService {
             throw new BadRequestException("concurrencyToken is required to replace a notification");
         }
         notificationAggregate.setConcurrencyToken(dto.getConcurrencyToken());
-        setNotificationDetails(dto, notificationAggregate);
+        replaceFulfilmentsEnsuringNotification(dto, notificationAggregate);
         return saveWithStatus(notificationAggregate, notificationAggregate.getStatus());
     }
 
@@ -287,7 +287,7 @@ public class NotificationService {
         notificationAggregate.setCreated(Instant.now());
         notificationAggregate.setStatus(NotificationStatus.DRAFT);
         stampExpiry(notificationAggregate);
-        setNotificationDetails(dto, notificationAggregate);
+        replaceFulfilmentsEnsuringNotification(dto, notificationAggregate);
         for (int attempt = 1; attempt <= MAX_REF_RETRIES; attempt++) {
             notificationAggregate.setReferenceNumber(referenceNumberGenerator.generate());
             try {
@@ -317,7 +317,7 @@ public class NotificationService {
         }
         existing.setConcurrencyToken(dto.getConcurrencyToken());
         log.info("Updating notification {}", referenceNumber);
-        setNotificationDetails(dto, existing);
+        replaceFulfilmentsEnsuringNotification(dto, existing);
         return saveWithStatus(existing, existing.getStatus());
     }
 
@@ -327,12 +327,11 @@ public class NotificationService {
                 CANNOT_FIND_NOTIFICATION_WITH_REFERENCE_NUMBER + referenceNumber));
     }
 
-    private void setNotificationDetails(NotificationDto dto, NotificationAggregate notificationAggregate) {
+    private void replaceFulfilmentsEnsuringNotification(NotificationDto dto, NotificationAggregate notificationAggregate) {
         if (notificationAggregate.getNotification() == null) {
             notificationAggregate.setNotification(new Notification());
         }
         notificationAggregate.setFulfilments(dto.getFulfilments());
-        notificationAggregate.setUpdated(Instant.now());
     }
 
     private void createNotificationAuditRecord(
