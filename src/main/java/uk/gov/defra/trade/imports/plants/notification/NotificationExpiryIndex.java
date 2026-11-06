@@ -29,7 +29,6 @@ import uk.gov.defra.trade.imports.plants.configuration.NotificationTtlConfig;
 @ConditionalOnProperty(prefix = "notification.ttl.expiry", name = "enabled", havingValue = "true")
 public class NotificationExpiryIndex {
 
-  static final String INDEX_NAME = "notification_expire_at_ttl";
   private static final String EXPIRE_AT = "expireAt";
 
   private final MongoTemplate mongoTemplate;
@@ -41,11 +40,12 @@ public class NotificationExpiryIndex {
       log.warn("Notification expiry is enabled in prod; refusing to create the TTL index");
       return;
     }
+    String indexName = "notification_expire_at_ttl";
     IndexOperations indexOps = mongoTemplate.indexOps(NotificationAggregate.class);
     dropPlainExpireAtIndexes(indexOps);
     indexOps.createIndex(
-        new Index().on(EXPIRE_AT, Sort.Direction.ASC).expire(Duration.ZERO).named(INDEX_NAME));
-    log.info("Notification expiry TTL index {} is in place", INDEX_NAME);
+        new Index().on(EXPIRE_AT, Sort.Direction.ASC).expire(Duration.ZERO).named(indexName));
+    log.info("Notification expiry TTL index {} is in place", indexName);
   }
 
   private static void dropPlainExpireAtIndexes(IndexOperations indexOps) {
