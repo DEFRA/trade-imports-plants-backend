@@ -35,6 +35,12 @@
 - CDP sends all egress except database traffic through its proxy. `ProxyConfig` sets the JVM proxy properties and the default `ProxySelector` from `HTTP_PROXY`, so every Java HTTP client uses it.
 - A malformed proxy URL is logged with its user info replaced by `***`, and without the parse exception, because that exception's message quotes the whole URL, credentials included.
 
+## Notification content and amendments
+
+- `NotificationAggregate` holds identity and metadata at the top, the typed content in its `Notification` sub-object, and the obligation fulfilments as an opaque payload. The backend stores fulfilments as given and never interprets them.
+- `submittedAt` is the most recent submission. Submitting from `DRAFT` sets it and submitting from `AMEND` refreshes it. Starting or cancelling an amendment leaves it alone, so cancelling keeps the time of the submission it returns to.
+- `submittedNotificationBaseline` and `submittedFulfilmentsBaseline` snapshot the two sub-objects independently and are held only while the status is `AMEND`. Starting an amendment takes them, cancelling restores from them and clears them, and submitting from `AMEND` clears them.
+
 ## Automatic expiry outside prod
 
 Two independent safeguards keep expiry out of prod; both must fail before prod loses a notification:
