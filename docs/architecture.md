@@ -5,6 +5,10 @@
 - `spring-boot-devtools` gives hot reload in the Dockerfile's dev-run stage. It is `optional`, so it never ships to consumers.
 - The Surefire and Failsafe `argLine` starts with `@{argLine}`, which picks up JaCoCo's `-javaagent` through late binding. `-XX:+EnableDynamicAgentLoading` suppresses the JDK's warnings about Mockito and ByteBuddy attaching themselves as dynamic agents.
 
+## MongoDB connection
+
+- AWS IAM authentication comes from the connection string: `mongodb://host:port/database?authMechanism=MONGODB-AWS&authSource=$external`.
+
 ## Dates and times in MongoDB
 
 - MongoDB has no date-only type. Its `Date` is a moment, so storing a calendar date as one means choosing a zone. Spring Data's built-in converter chooses the JVM default zone, so under `Europe/London` in summer `2026-07-21` is stored as `2026-07-20T23:00:00Z`, a day early.
