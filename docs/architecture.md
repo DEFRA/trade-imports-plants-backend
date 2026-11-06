@@ -39,7 +39,7 @@
 
 Two independent safeguards keep expiry out of prod; both must fail before prod loses a notification:
 
-- Stamping: `expireAt` is set at creation only when `NOTIFICATION_TTL_DAYS` is configured and `ENVIRONMENT` is not `prod`.
+- Stamping: `expireAt` is set at creation only when `NOTIFICATION_TTL_DAYS` is configured and `ENVIRONMENT` is not `prod`, in any letter case.
 - Removal: `NotificationExpiryIndex` creates the Mongo TTL index on `expireAt` only when `NOTIFICATION_TTL_EXPIRY_ENABLED=true`, with no `matchIfMissing`, and refuses in prod.
 
 `expireAt` counts from `created`, so later edits do not extend it. Mongo's TTL monitor removes a notification within about a minute of its `expireAt` and skips notifications with no `expireAt`. Removal writes no audit record, because it is not a user action.
