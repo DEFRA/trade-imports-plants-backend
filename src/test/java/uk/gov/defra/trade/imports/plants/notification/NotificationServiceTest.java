@@ -667,20 +667,41 @@ class NotificationServiceTest {
         assertThat(listener.value()).containsExactly(ApplicationReadyEvent.class);
     }
 
-    @Test
-    void deleteByReferenceNumbers_shouldDeleteAllAndAuditSuccess_whenEveryReferenceExists() {
-        // Given
-        when(notificationRepository.findAllReferencesByReferenceNumberIn(List.of(REFERENCE)))
+    private void onlyReferenceExistsAmong(List<String> requestedReferences) {
+        when(notificationRepository.findAllReferencesByReferenceNumberIn(requestedReferences))
             .thenReturn(List.of(() -> REFERENCE));
+    }
 
-        // When
-        notificationService.deleteByReferenceNumbers(List.of(REFERENCE), AUDIT_CONTEXT);
-
-        // Then
-        verify(notificationRepository).deleteAllByReferenceNumberIn(List.of(REFERENCE));
+    private Audit savedAudit() {
         ArgumentCaptor<Audit> auditCaptor = ArgumentCaptor.forClass(Audit.class);
         verify(auditRepository).save(auditCaptor.capture());
-        Audit audit = auditCaptor.getValue();
+        return auditCaptor.getValue();
+    }
+
+    private Throwable deleteWithAMissingReference() {
+        List<String> requestedReferences = List.of(REFERENCE, "26-MSSNG1");
+        onlyReferenceExistsAmong(requestedReferences);
+
+        return catchThrowable(
+            () -> notificationService.deleteByReferenceNumbers(requestedReferences, AUDIT_CONTEXT));
+    }
+
+    @Test
+    void deleteByReferenceNumbers_shouldDeleteAll_whenEveryReferenceExists() {
+        onlyReferenceExistsAmong(List.of(REFERENCE));
+
+        notificationService.deleteByReferenceNumbers(List.of(REFERENCE), AUDIT_CONTEXT);
+
+        verify(notificationRepository).deleteAllByReferenceNumberIn(List.of(REFERENCE));
+    }
+
+    @Test
+    void deleteByReferenceNumbers_shouldAuditSuccess_whenEveryReferenceExists() {
+        onlyReferenceExistsAmong(List.of(REFERENCE));
+
+        notificationService.deleteByReferenceNumbers(List.of(REFERENCE), AUDIT_CONTEXT);
+
+        Audit audit = savedAudit();
         assertThat(audit.getResult()).isEqualTo(Result.SUCCESS);
         assertThat(audit.getAction()).isEqualTo(Action.DELETE_NOTIFICATIONS);
         assertThat(audit.getTraceId()).isEqualTo("trace-1");
@@ -689,34 +710,33 @@ class NotificationServiceTest {
 
     @Test
     void deleteByReferenceNumbers_shouldLogTheCountAndReferenceNumbers_whenEveryReferenceExists() {
-        // Given
-        when(notificationRepository.findAllReferencesByReferenceNumberIn(List.of(REFERENCE)))
-            .thenReturn(List.of(() -> REFERENCE));
+        onlyReferenceExistsAmong(List.of(REFERENCE));
 
-        // When
         List<String> messages = messagesLoggedDuring(
             () -> notificationService.deleteByReferenceNumbers(List.of(REFERENCE), AUDIT_CONTEXT));
 
-        // Then
         assertThat(messages).containsExactly("Deleting 1 notifications: [26-ABC123]");
     }
 
     @Test
-    void deleteByReferenceNumbers_shouldDeleteNothingAndAuditFailure_whenAnyReferenceIsMissing() {
-        // Given only one of the two references exists
-        when(notificationRepository.findAllReferencesByReferenceNumberIn(List.of(REFERENCE, "26-MSSNG1")))
-            .thenReturn(List.of(() -> REFERENCE));
+    void deleteByReferenceNumbers_shouldThrowNotFoundNamingTheMissingReference_whenAnyReferenceIsMissing() {
+        Throwable thrown = deleteWithAMissingReference();
 
-        // When / Then
-        assertThatThrownBy(() -> notificationService.deleteByReferenceNumbers(
-            List.of(REFERENCE, "26-MSSNG1"), AUDIT_CONTEXT))
-            .isInstanceOf(NotFoundException.class)
-            .hasMessageContaining("26-MSSNG1");
+        assertThat(thrown).isInstanceOf(NotFoundException.class).hasMessageContaining("26-MSSNG1");
+    }
+
+    @Test
+    void deleteByReferenceNumbers_shouldDeleteNothing_whenAnyReferenceIsMissing() {
+        deleteWithAMissingReference();
 
         verify(notificationRepository, never()).deleteAllByReferenceNumberIn(anyList());
-        ArgumentCaptor<Audit> auditCaptor = ArgumentCaptor.forClass(Audit.class);
-        verify(auditRepository).save(auditCaptor.capture());
-        assertThat(auditCaptor.getValue().getResult()).isEqualTo(Result.FAILURE);
+    }
+
+    @Test
+    void deleteByReferenceNumbers_shouldAuditFailure_whenAnyReferenceIsMissing() {
+        deleteWithAMissingReference();
+
+        assertThat(savedAudit().getResult()).isEqualTo(Result.FAILURE);
     }
 
     @Test
