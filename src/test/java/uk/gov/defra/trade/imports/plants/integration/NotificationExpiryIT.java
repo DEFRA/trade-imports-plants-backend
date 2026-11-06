@@ -33,7 +33,6 @@ import uk.gov.defra.trade.imports.plants.notification.NotificationStatus;
 
 @TestPropertySource(
     properties = {
-        "notification.ttl.days=7",
         "notification.ttl.expiry.enabled=true",
         "spring.data.mongodb.database=notification-expiry-it"
     })
@@ -136,7 +135,6 @@ class NotificationExpiryIT extends IntegrationBase {
     notificationRepository.save(NotificationAggregate.builder()
         .referenceNumber(referenceNumber)
         .status(NotificationStatus.DRAFT)
-        .created(Instant.now().minus(8, ChronoUnit.DAYS))
         .expireAt(expireAt)
         .build());
     return referenceNumber;
