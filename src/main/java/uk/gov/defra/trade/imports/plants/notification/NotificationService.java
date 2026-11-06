@@ -7,6 +7,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.data.domain.Page;
@@ -62,6 +64,22 @@ public class NotificationService {
         this.ttlConfig = ttlConfig;
         this.listPageSize = listPageSize;
         this.adminPageSize = adminPageSize;
+    }
+
+    /**
+     * Logs once the application is ready whether new notifications get an expiry stamped in this
+     * environment and, when they do not, why.
+     */
+    @EventListener(ApplicationReadyEvent.class)
+    public void logExpiryStamping() {
+        String environment = ttlConfig.environment();
+        if (ttlConfig.isProd()) {
+            log.info("Notification expiry stamping is off: environment {} is prod", environment);
+        } else if (ttlConfig.days() == null) {
+            log.info("Notification expiry stamping is off: no days set in environment {}", environment);
+        } else {
+            log.info("Notification expiry stamping is on: {} days in environment {}", ttlConfig.days(), environment);
+        }
     }
 
     /** Creates a notification when the DTO carries no reference number, otherwise updates that one. */
@@ -209,9 +227,15 @@ public class NotificationService {
 
     private NotificationAggregate saveWithStatus(NotificationAggregate notificationAggregate,
         NotificationStatus targetStatus) {
+        NotificationStatus previousStatus = notificationAggregate.getStatus();
         notificationAggregate.setStatus(targetStatus);
         notificationAggregate.setUpdated(Instant.now());
-        return notificationRepository.save(notificationAggregate);
+        NotificationAggregate saved = notificationRepository.save(notificationAggregate);
+        if (previousStatus != targetStatus) {
+            log.info("Notification {} status changed from {} to {}",
+                saved.getReferenceNumber(), previousStatus, targetStatus);
+        }
+        return saved;
     }
 
     private void applySubmission(NotificationAggregate notificationAggregate) {
@@ -227,6 +251,7 @@ public class NotificationService {
     public NotificationAggregate softDeleteNotification(String referenceNumber) {
         NotificationAggregate notificationAggregate = requireByReferenceNumber(referenceNumber);
         if (notificationAggregate.getStatus() == NotificationStatus.DELETED) {
+            log.info("Notification {} is already DELETED, nothing changed", referenceNumber);
             return notificationAggregate;
         }
         if (notificationAggregate.getStatus() != NotificationStatus.DRAFT

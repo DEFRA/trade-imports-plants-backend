@@ -25,6 +25,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import uk.gov.defra.trade.imports.plants.audit.Action;
@@ -490,6 +492,137 @@ class NotificationServiceTest {
         // Then — no second write
         assertThat(result.getStatus()).isEqualTo(NotificationStatus.DELETED);
         verify(notificationRepository, never()).save(any());
+    }
+
+    private static List<String> messagesLoggedDuring(Runnable action) {
+        return messagesOf(logEventsDuring(NotificationService.class, action));
+    }
+
+    @Test
+    void softDeleteNotification_shouldLogTheReferenceAndNothingChanged_whenAlreadyDeleted() {
+        // Given
+        when(notificationRepository.findByReferenceNumber(REFERENCE))
+            .thenReturn(Optional.of(stored(NotificationStatus.DELETED)));
+
+        // When
+        List<String> messages = messagesLoggedDuring(() -> notificationService.softDeleteNotification(REFERENCE));
+
+        // Then
+        assertThat(messages).containsExactly("Notification 26-ABC123 is already DELETED, nothing changed");
+    }
+
+    @Test
+    void softDeleteNotification_shouldLogTheStatusChange() {
+        // Given
+        when(notificationRepository.findByReferenceNumber(REFERENCE))
+            .thenReturn(Optional.of(stored(NotificationStatus.DRAFT)));
+        repositoryEchoesSaves();
+
+        // When
+        List<String> messages = messagesLoggedDuring(() -> notificationService.softDeleteNotification(REFERENCE));
+
+        // Then
+        assertThat(messages).containsExactly("Notification 26-ABC123 status changed from DRAFT to DELETED");
+    }
+
+    @Test
+    void submitNotification_shouldLogTheStatusChange() {
+        // Given
+        when(notificationRepository.findByReferenceNumber(REFERENCE))
+            .thenReturn(Optional.of(stored(NotificationStatus.AMEND)));
+        repositoryEchoesSaves();
+
+        // When
+        List<String> messages = messagesLoggedDuring(() -> notificationService.submitNotification(REFERENCE));
+
+        // Then
+        assertThat(messages).containsExactly("Notification 26-ABC123 status changed from AMEND to SUBMITTED");
+    }
+
+    @Test
+    void amendNotification_shouldLogTheStatusChange() {
+        // Given
+        NotificationAggregate submitted = stored(NotificationStatus.SUBMITTED);
+        submitted.setFulfilments(List.of(new Document("k", "submitted")));
+        when(notificationRepository.findByReferenceNumber(REFERENCE)).thenReturn(Optional.of(submitted));
+        when(notificationContentMapper.deepClone(any())).thenReturn(new Notification());
+        repositoryEchoesSaves();
+
+        // When
+        List<String> messages = messagesLoggedDuring(() -> notificationService.amendNotification(REFERENCE));
+
+        // Then
+        assertThat(messages).containsExactly("Notification 26-ABC123 status changed from SUBMITTED to AMEND");
+    }
+
+    @Test
+    void cancelAmendNotification_shouldLogTheStatusChange() {
+        // Given
+        NotificationAggregate amending = stored(NotificationStatus.AMEND);
+        amending.setSubmittedNotificationBaseline(new Notification());
+        amending.setSubmittedFulfilmentsBaseline(List.of(new Document("k", "submitted")));
+        when(notificationRepository.findByReferenceNumber(REFERENCE)).thenReturn(Optional.of(amending));
+        when(notificationContentMapper.deepClone(any())).thenReturn(new Notification());
+        repositoryEchoesSaves();
+
+        // When
+        List<String> messages = messagesLoggedDuring(() -> notificationService.cancelAmendNotification(REFERENCE));
+
+        // Then
+        assertThat(messages).containsExactly("Notification 26-ABC123 status changed from AMEND to SUBMITTED");
+    }
+
+    @Test
+    void replace_shouldLogOnlyTheUpdate_whenTheStatusStaysTheSame() {
+        // Given
+        when(notificationRepository.findByReferenceNumber(REFERENCE))
+            .thenReturn(Optional.of(stored(NotificationStatus.DRAFT)));
+        repositoryEchoesSaves();
+
+        // When
+        List<String> messages = messagesLoggedDuring(() -> notificationService.replace(REFERENCE,
+            NotificationDto.builder().concurrencyToken(2L).build()));
+
+        // Then
+        assertThat(messages).containsExactly("Updating notification 26-ABC123");
+    }
+
+    @Test
+    void logExpiryStamping_shouldGiveDaysAndEnvironment_whenStampingIsOn() {
+        // When
+        List<String> messages = messagesLoggedDuring(newService(ttlConfig(7, "dev"))::logExpiryStamping);
+
+        // Then
+        assertThat(messages).containsExactly("Notification expiry stamping is on: 7 days in environment dev");
+    }
+
+    @Test
+    void logExpiryStamping_shouldNameProdAsTheReason_whenDaysAreSetInProd() {
+        // When
+        List<String> messages = messagesLoggedDuring(newService(ttlConfig(7, "prod"))::logExpiryStamping);
+
+        // Then
+        assertThat(messages).containsExactly("Notification expiry stamping is off: environment prod is prod");
+    }
+
+    @Test
+    void logExpiryStamping_shouldNameMissingDaysAsTheReason_whenNoDaysAreSetOutsideProd() {
+        // When
+        List<String> messages = messagesLoggedDuring(newService(ttlConfig(null, "dev"))::logExpiryStamping);
+
+        // Then
+        assertThat(messages).containsExactly("Notification expiry stamping is off: no days set in environment dev");
+    }
+
+    @Test
+    void logExpiryStamping_shouldListenForTheApplicationBeingReady() throws NoSuchMethodException {
+        // When
+        EventListener listener = NotificationService.class
+            .getMethod("logExpiryStamping")
+            .getAnnotation(EventListener.class);
+
+        // Then
+        assertThat(listener.value()).containsExactly(ApplicationReadyEvent.class);
     }
 
     @Test
