@@ -35,6 +35,9 @@ import uk.gov.defra.trade.imports.plants.notification.SaveNotificationDto;
  */
 class NotificationIT extends IntegrationBase {
 
+    private static final String ORG_ID = "5900002";
+    private static final String OTHER_ORG_ID = "9999999";
+
     /** An RFC 3339 instant in UTC: a date, a time, optional fractional seconds and a {@code Z}. */
     private static final String UTC_INSTANT =
         "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z";
@@ -56,6 +59,7 @@ class NotificationIT extends IntegrationBase {
 
     private NotificationAggregate createDraft(List<Document> fulfilments) throws Exception {
         MvcResult result = mockMvc.perform(post("/notifications")
+                .header(NotificationController.HEADER_ORGANISATION_ID, ORG_ID)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(SaveNotificationDto.of(
                     NotificationDto.builder().fulfilments(fulfilments).build()))))
@@ -73,6 +77,7 @@ class NotificationIT extends IntegrationBase {
         // Then
         assertThat(created.getReferenceNumber()).matches(ReferenceNumberGenerator.REFERENCE_NUMBER_PATTERN);
         assertThat(created.getStatus()).isEqualTo(NotificationStatus.DRAFT);
+        assertThat(created.getOrganisationId()).isEqualTo(ORG_ID);
         assertThat(notificationRepository.findByReferenceNumber(created.getReferenceNumber()))
             .isPresent();
     }
@@ -90,7 +95,8 @@ class NotificationIT extends IntegrationBase {
         NotificationAggregate created = createDraft(payload);
 
         // Then — read back through the fulfilments-view projection the frontend engine uses
-        mockMvc.perform(get("/notifications/{ref}/fulfilments", created.getReferenceNumber()))
+        mockMvc.perform(get("/notifications/{ref}/fulfilments", created.getReferenceNumber())
+                .header(NotificationController.HEADER_ORGANISATION_ID, ORG_ID))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.referenceNumber").value(created.getReferenceNumber()))
             .andExpect(jsonPath("$.status").value("DRAFT"))
@@ -105,6 +111,7 @@ class NotificationIT extends IntegrationBase {
         // Given a draft that has already been updated once
         NotificationAggregate created = createDraft(List.of());
         mockMvc.perform(put("/notifications/{ref}", created.getReferenceNumber())
+                .header(NotificationController.HEADER_ORGANISATION_ID, ORG_ID)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(SaveNotificationDto.of(
                     NotificationDto.builder()
@@ -115,6 +122,7 @@ class NotificationIT extends IntegrationBase {
 
         // When a second writer replays the original token
         mockMvc.perform(put("/notifications/{ref}", created.getReferenceNumber())
+                .header(NotificationController.HEADER_ORGANISATION_ID, ORG_ID)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(SaveNotificationDto.of(
                     NotificationDto.builder()
@@ -131,9 +139,11 @@ class NotificationIT extends IntegrationBase {
         // Given a submitted notification
         NotificationAggregate created = createDraft(List.of(new Document("k", "submitted")));
         String reference = created.getReferenceNumber();
-        mockMvc.perform(post("/notifications/{ref}/submit", reference)).andExpect(status().isOk());
+        mockMvc.perform(post("/notifications/{ref}/submit", reference)
+                .header(NotificationController.HEADER_ORGANISATION_ID, ORG_ID)).andExpect(status().isOk());
 
-        MvcResult amended = mockMvc.perform(post("/notifications/{ref}/amend", reference))
+        MvcResult amended = mockMvc.perform(post("/notifications/{ref}/amend", reference)
+                .header(NotificationController.HEADER_ORGANISATION_ID, ORG_ID))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("AMEND"))
             .andReturn();
@@ -142,6 +152,7 @@ class NotificationIT extends IntegrationBase {
 
         // When the amendment edits the payload and is then cancelled
         mockMvc.perform(put("/notifications/{ref}", reference)
+                .header(NotificationController.HEADER_ORGANISATION_ID, ORG_ID)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(SaveNotificationDto.of(
                     NotificationDto.builder()
@@ -150,7 +161,8 @@ class NotificationIT extends IntegrationBase {
                         .build()))))
             .andExpect(status().isOk());
 
-        mockMvc.perform(post("/notifications/{ref}/cancel-amend", reference))
+        mockMvc.perform(post("/notifications/{ref}/cancel-amend", reference)
+                .header(NotificationController.HEADER_ORGANISATION_ID, ORG_ID))
             .andExpect(status().isOk())
             .andExpect(status().isOk());
 
@@ -171,6 +183,7 @@ class NotificationIT extends IntegrationBase {
 
         // When
         MvcResult result = mockMvc.perform(post("/notifications/{ref}/copy", created.getReferenceNumber())
+                .header(NotificationController.HEADER_ORGANISATION_ID, ORG_ID)
                 .param("concurrencyToken", String.valueOf(created.getConcurrencyToken())))
             .andExpect(status().isOk())
             .andReturn();
@@ -189,17 +202,20 @@ class NotificationIT extends IntegrationBase {
     void list_shouldCarryTheSubmissionTimestampOnceTheNotificationIsSubmitted() throws Exception {
         // Given — a draft has no submission timestamp to carry
         NotificationAggregate created = createDraft(List.of());
-        mockMvc.perform(get("/notifications"))
+        mockMvc.perform(get("/notifications")
+                .header(NotificationController.HEADER_ORGANISATION_ID, ORG_ID))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.content[0].status").value("DRAFT"))
             .andExpect(jsonPath("$.content[0].submittedAt").isEmpty());
 
         // When
-        mockMvc.perform(post("/notifications/{ref}/submit", created.getReferenceNumber()))
+        mockMvc.perform(post("/notifications/{ref}/submit", created.getReferenceNumber())
+                .header(NotificationController.HEADER_ORGANISATION_ID, ORG_ID))
             .andExpect(status().isOk());
 
         // Then — the list projection loads submittedAt from the aggregate, not just the single read
-        mockMvc.perform(get("/notifications"))
+        mockMvc.perform(get("/notifications")
+                .header(NotificationController.HEADER_ORGANISATION_ID, ORG_ID))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.content[0].status").value("SUBMITTED"))
             .andExpect(jsonPath("$.content[0].submittedAt").isNotEmpty());
@@ -209,6 +225,7 @@ class NotificationIT extends IntegrationBase {
     void timestamps_shouldBeRfc3339InstantsWithAZSuffix_inEveryResponse() throws Exception {
         // Given / When — the write response
         MvcResult saved = mockMvc.perform(post("/notifications")
+                .header(NotificationController.HEADER_ORGANISATION_ID, ORG_ID)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(SaveNotificationDto.of(
                     NotificationDto.builder().fulfilments(List.of()).build()))))
@@ -219,18 +236,21 @@ class NotificationIT extends IntegrationBase {
         String reference = objectMapper.readValue(
             saved.getResponse().getContentAsString(), NotificationAggregate.class).getReferenceNumber();
 
-        mockMvc.perform(post("/notifications/{ref}/submit", reference))
+        mockMvc.perform(post("/notifications/{ref}/submit", reference)
+                .header(NotificationController.HEADER_ORGANISATION_ID, ORG_ID))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.created", matchesPattern(UTC_INSTANT)))
             .andExpect(jsonPath("$.updated", matchesPattern(UTC_INSTANT)))
             .andExpect(jsonPath("$.submittedAt", matchesPattern(UTC_INSTANT)));
 
         // Then — the two read projections
-        mockMvc.perform(get("/notifications"))
+        mockMvc.perform(get("/notifications")
+                .header(NotificationController.HEADER_ORGANISATION_ID, ORG_ID))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.content[0].created", matchesPattern(UTC_INSTANT)))
             .andExpect(jsonPath("$.content[0].submittedAt", matchesPattern(UTC_INSTANT)));
-        mockMvc.perform(get("/notifications/{ref}/fulfilments", reference))
+        mockMvc.perform(get("/notifications/{ref}/fulfilments", reference)
+                .header(NotificationController.HEADER_ORGANISATION_ID, ORG_ID))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.created", matchesPattern(UTC_INSTANT)))
             .andExpect(jsonPath("$.submittedAt", matchesPattern(UTC_INSTANT)));
@@ -240,6 +260,7 @@ class NotificationIT extends IntegrationBase {
     void post_shouldReturn400_whenTheBodyIsNotWellFormedJson() throws Exception {
         // When / Then
         mockMvc.perform(post("/notifications")
+                .header(NotificationController.HEADER_ORGANISATION_ID, ORG_ID)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"notification\":"))
             .andExpect(status().isBadRequest())
@@ -252,16 +273,19 @@ class NotificationIT extends IntegrationBase {
     void softDelete_shouldRemoveTheNotificationFromTheDashboardList() throws Exception {
         // Given
         NotificationAggregate created = createDraft(List.of());
-        mockMvc.perform(get("/notifications"))
+        mockMvc.perform(get("/notifications")
+                .header(NotificationController.HEADER_ORGANISATION_ID, ORG_ID))
             .andExpect(jsonPath("$.totalElements").value(1));
 
         // When
-        mockMvc.perform(post("/notifications/{ref}/soft-delete", created.getReferenceNumber()))
+        mockMvc.perform(post("/notifications/{ref}/soft-delete", created.getReferenceNumber())
+                .header(NotificationController.HEADER_ORGANISATION_ID, ORG_ID))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("DELETED"));
 
         // Then — the row is retained but no longer listed
-        mockMvc.perform(get("/notifications"))
+        mockMvc.perform(get("/notifications")
+                .header(NotificationController.HEADER_ORGANISATION_ID, ORG_ID))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.totalElements").value(0));
         assertThat(notificationRepository.findByReferenceNumber(created.getReferenceNumber()))
@@ -334,5 +358,31 @@ class NotificationIT extends IntegrationBase {
                     .created(Instant.now())
                     .build()))
             .isInstanceOf(org.springframework.dao.DuplicateKeyException.class);
+    }
+
+    @Test
+    void organisationScope_shouldHideNotificationFromOtherOrganisation() throws Exception {
+        NotificationAggregate created = createDraft(List.of());
+        mockMvc.perform(post("/notifications/{ref}/submit", created.getReferenceNumber())
+                .header(NotificationController.HEADER_ORGANISATION_ID, ORG_ID))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(get("/notifications/{ref}/fulfilments", created.getReferenceNumber())
+                .header(NotificationController.HEADER_ORGANISATION_ID, OTHER_ORG_ID))
+            .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/notifications")
+                .header(NotificationController.HEADER_ORGANISATION_ID, OTHER_ORG_ID))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.totalElements").value(0));
+    }
+
+    @Test
+    void traderRoutes_shouldRejectRequestsWithoutOrganisationHeader() throws Exception {
+        mockMvc.perform(post("/notifications")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(SaveNotificationDto.of(
+                    NotificationDto.builder().build()))))
+            .andExpect(status().isBadRequest());
     }
 }
