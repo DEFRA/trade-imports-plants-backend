@@ -163,7 +163,6 @@ class NotificationIT extends IntegrationBase {
 
         mockMvc.perform(post("/notifications/{ref}/cancel-amend", reference)
                 .header(NotificationController.HEADER_ORGANISATION_ID, ORG_ID))
-            .andExpect(status().isOk())
             .andExpect(status().isOk());
 
         // Then the pre-amend payload is back and the baselines are cleared
@@ -375,6 +374,36 @@ class NotificationIT extends IntegrationBase {
                 .header(NotificationController.HEADER_ORGANISATION_ID, OTHER_ORG_ID))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.totalElements").value(0));
+
+        mockMvc.perform(post("/notifications/{ref}/amend", created.getReferenceNumber())
+                .header(NotificationController.HEADER_ORGANISATION_ID, OTHER_ORG_ID))
+            .andExpect(status().isNotFound());
+
+        NotificationAggregate submitted =
+            notificationRepository.findByReferenceNumber(created.getReferenceNumber()).orElseThrow();
+        String reference = submitted.getReferenceNumber();
+        Long concurrencyToken = submitted.getConcurrencyToken();
+
+        mockMvc.perform(put("/notifications/{ref}", reference)
+                .header(NotificationController.HEADER_ORGANISATION_ID, OTHER_ORG_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(SaveNotificationDto.of(
+                    NotificationDto.builder().concurrencyToken(concurrencyToken).build()))))
+            .andExpect(status().isNotFound());
+
+        mockMvc.perform(post("/notifications/{ref}/submit", reference)
+                .header(NotificationController.HEADER_ORGANISATION_ID, OTHER_ORG_ID)
+                .param("concurrencyToken", String.valueOf(concurrencyToken)))
+            .andExpect(status().isNotFound());
+
+        mockMvc.perform(post("/notifications/{ref}/copy", reference)
+                .header(NotificationController.HEADER_ORGANISATION_ID, OTHER_ORG_ID)
+                .param("concurrencyToken", String.valueOf(concurrencyToken)))
+            .andExpect(status().isNotFound());
+
+        mockMvc.perform(post("/notifications/{ref}/soft-delete", reference)
+                .header(NotificationController.HEADER_ORGANISATION_ID, OTHER_ORG_ID))
+            .andExpect(status().isNotFound());
     }
 
     @Test
