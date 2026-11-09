@@ -24,6 +24,11 @@
 - It reads the original zone in `setUp`, after the Spring context has pinned it to UTC, so the restore puts back UTC and not the host zone.
 - No document has a typed date-only property yet, so the `LocalDate` converters are proved against a test-only `DateProbe` document.
 
+## JSON serialisation
+
+- `spring.jackson.serialization.fail-on-empty-beans` is `false` because the `Notification` content sub-object has no fields until the plants data model is agreed, and Jackson refuses to serialise a bean with no properties by default. Remove the setting once `Notification` carries fields.
+- `spring.jackson.serialization.write-dates-as-timestamps` is pinned to `false`, the Spring Boot default, so it cannot change by accident. Turned on, it would serialise an `Instant` as a decimal epoch and a `LocalDate` as a `[year, month, day]` array instead of ISO-8601 strings, which would break the API contract without any error.
+
 ## Error responses
 
 - `GlobalExceptionHandler` handles only application exceptions. Spring's own exceptions, such as a 404 for an unknown path, keep Spring's responses.
