@@ -77,7 +77,7 @@ class NotificationExpiryIT extends IntegrationBase {
   }
 
   @Test
-  void expiredNotifications_shouldBeRemovedByMongo_whileUndatedAndUnexpiredOnesStay() {
+  void ttlMonitor_shouldRemoveOnlyExpiredNotifications() {
     String expiredReference = "26-EXP001";
     String undatedReference = "26-UND001";
     String unexpiredReference = "26-UNE001";
