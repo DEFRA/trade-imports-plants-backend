@@ -63,7 +63,7 @@ class NotificationExpiryIT extends IntegrationBase {
 
   @Test
   void replacePlainExpireAtIndexWithTtlIndex_shouldLeaveOnlyTheTtlIndex_whenAPlainIndexExists() {
-    createPlainExpireAtIndex();
+    replaceExpireAtIndexesWithAPlainIndex();
 
     notificationExpiryIndex.replacePlainExpireAtIndexWithTtlIndex();
 
@@ -72,7 +72,7 @@ class NotificationExpiryIT extends IntegrationBase {
 
   @Test
   void replacePlainExpireAtIndexWithTtlIndex_shouldPutTheTtlIndexInPlace_whenAnotherInstanceDroppedThePlainIndexFirst() {
-    createPlainExpireAtIndex();
+    replaceExpireAtIndexesWithAPlainIndex();
 
     new NotificationExpiryIndex(
         templateThatDropsThePlainIndexAfterListingIndexes(),new NotificationTtlConfig(null, "dev"))
@@ -100,7 +100,7 @@ class NotificationExpiryIT extends IntegrationBase {
     assertThat(notificationRepository.findByReferenceNumber(unexpiredReference)).isPresent();
   }
 
-  private void createPlainExpireAtIndex() {
+  private void replaceExpireAtIndexesWithAPlainIndex() {
     IndexOperations notificationIndexes = mongoTemplate.indexOps(NotificationAggregate.class);
     expireAtIndexes(mongoTemplate)
         .forEach(index -> notificationIndexes.dropIndex(index.getString("name")));
