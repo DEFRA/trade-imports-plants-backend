@@ -194,10 +194,10 @@ class NotificationServiceTest {
 
     @Test
     void saveNotification_shouldLogEachAttemptWithNoPromiseOfARetry_whenAllPersistenceAttemptsCollide() {
-        List<ILoggingEvent> events = logEventsDuring(NotificationService.class,
+        List<String> messages = messagesLoggedDuring(
             () -> saveWhoseThreeAttemptsCollide(new DuplicateKeyException("last collision")));
 
-        assertThat(messagesOf(events)).containsExactly(
+        assertThat(messages).containsExactly(
             "Reference number " + attemptedReferences.get(0) + " collided on persistence attempt 1/3",
             "Reference number " + attemptedReferences.get(1) + " collided on persistence attempt 2/3",
             "Reference number " + attemptedReferences.get(2) + " collided on persistence attempt 3/3");
