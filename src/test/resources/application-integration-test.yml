@@ -69,6 +69,8 @@ management:
   health:
     mongo:
       enabled: false
+  metrics:
+    enabled: false
 
 # Application info (exposed via /info endpoint)
 info:
