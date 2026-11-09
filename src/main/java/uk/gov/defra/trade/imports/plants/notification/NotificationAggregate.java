@@ -12,8 +12,6 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.Version;
 import org.springframework.data.mongodb.core.index.Indexed;
 
-import static java.util.Objects.requireNonNull;
-
 @org.springframework.data.mongodb.core.mapping.Document(collection = "notification")
 @Data
 @Builder(toBuilder = true)
@@ -50,9 +48,4 @@ public class NotificationAggregate {
 
     @JsonIgnore
     private List<Document> submittedFulfilmentsBaseline;
-
-    public Notification requireNotification() {
-        return requireNonNull(notification,
-            "NotificationAggregate requires a notification sub-object");
-    }
 }
