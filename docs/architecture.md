@@ -45,7 +45,7 @@
 - `NotificationAggregate` holds identity and metadata at the top, the typed content in its `Notification` sub-object, and the obligation fulfilments as an opaque payload. The backend stores fulfilments as given and never interprets them.
 - `submittedAt` is the most recent submission. Submitting from `DRAFT` sets it and submitting from `AMEND` refreshes it. Starting or cancelling an amendment leaves it alone, so cancelling keeps the time of the submission it returns to.
 - `submittedNotificationBaseline` and `submittedFulfilmentsBaseline` snapshot the two sub-objects independently. Starting an amendment takes them, cancelling restores from them and clears them, and submitting from `AMEND` clears them. A soft delete from `AMEND` leaves them in place, so a `DELETED` notification can still hold them.
-- Soft delete follows the REST `DELETE` convention. Deleting a notification that is already `DELETED` changes nothing and returns it, so a repeat call after a lost response does no harm.
+- A repeat soft delete changes nothing and returns the notification, so a repeat call after a lost response does no harm.
 
 ## Automatic expiry outside prod
 
