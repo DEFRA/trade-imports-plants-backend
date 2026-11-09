@@ -25,14 +25,14 @@ class NotificationTtlConfigTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"prod", "PROD", "Prod"})
-    void isProd_shouldBeTrue_whenEnvironmentIsProdInAnyCase(String environment) {
+    void isProd_shouldReturnTrue_whenEnvironmentIsProdInAnyCase(String environment) {
         assertThat(withEnvironment(environment).isProd()).isTrue();
     }
 
     @ParameterizedTest
     @NullSource
     @ValueSource(strings = {"local", "dev", "test", "perf-test", "ext-test", "production"})
-    void isProd_shouldBeFalse_whenEnvironmentIsNotProd(String environment) {
+    void isProd_shouldReturnFalse_whenEnvironmentIsNotProdInAnyCase(String environment) {
         assertThat(withEnvironment(environment).isProd()).isFalse();
     }
 
