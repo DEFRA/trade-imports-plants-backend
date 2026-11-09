@@ -109,7 +109,7 @@ class NotificationControllerTest {
         when(notificationService.replace(REFERENCE, sentNotification()))
             .thenReturn(aggregate(NotificationStatus.DRAFT));
 
-        mockMvc.perform(put("/notifications/{ref}", REFERENCE)
+        mockMvc.perform(put("/notifications/{referenceNumber}", REFERENCE)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(SaveNotificationDto.of(sentNotification()))))
             .andExpect(status().isOk())
@@ -119,7 +119,7 @@ class NotificationControllerTest {
     @ParameterizedTest
     @ValueSource(strings = {"26-ABC123", "GBN-AG-26-ABC123", "GBN-HRP-26-ABC12I"})
     void put_shouldReturn400_whenReferenceNumberDoesNotMatchThePlantsPattern(String reference) throws Exception {
-        mockMvc.perform(put("/notifications/{ref}", reference)
+        mockMvc.perform(put("/notifications/{referenceNumber}", reference)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(SaveNotificationDto.of(
                     NotificationDto.builder().concurrencyToken(1L).build()))))
@@ -133,7 +133,7 @@ class NotificationControllerTest {
         when(notificationService.submitNotification(REFERENCE))
             .thenReturn(aggregate(NotificationStatus.SUBMITTED));
 
-        mockMvc.perform(post("/notifications/{ref}/submit", REFERENCE))
+        mockMvc.perform(post("/notifications/{referenceNumber}/submit", REFERENCE))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("SUBMITTED"));
     }
@@ -143,7 +143,7 @@ class NotificationControllerTest {
         when(notificationService.submitNotification(REFERENCE))
             .thenThrow(new BadRequestException("Cannot submit notification with status: DELETED"));
 
-        mockMvc.perform(post("/notifications/{ref}/submit", REFERENCE))
+        mockMvc.perform(post("/notifications/{referenceNumber}/submit", REFERENCE))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.detail").value("Cannot submit notification with status: DELETED"));
     }
@@ -153,7 +153,7 @@ class NotificationControllerTest {
         when(notificationService.amendNotification(REFERENCE))
             .thenReturn(aggregate(NotificationStatus.AMEND));
 
-        mockMvc.perform(post("/notifications/{ref}/amend", REFERENCE))
+        mockMvc.perform(post("/notifications/{referenceNumber}/amend", REFERENCE))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("AMEND"));
     }
@@ -163,7 +163,7 @@ class NotificationControllerTest {
         when(notificationService.cancelAmendNotification(REFERENCE))
             .thenReturn(aggregate(NotificationStatus.SUBMITTED));
 
-        mockMvc.perform(post("/notifications/{ref}/cancel-amend", REFERENCE))
+        mockMvc.perform(post("/notifications/{referenceNumber}/cancel-amend", REFERENCE))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("SUBMITTED"));
     }
@@ -173,7 +173,7 @@ class NotificationControllerTest {
         when(notificationService.copyNotification(REFERENCE, 1L))
             .thenThrow(new OptimisticLockingFailureException("source has advanced"));
 
-        mockMvc.perform(post("/notifications/{ref}/copy", REFERENCE)
+        mockMvc.perform(post("/notifications/{referenceNumber}/copy", REFERENCE)
                 .param("concurrencyToken", "1"))
             .andExpect(status().isConflict())
             .andExpect(jsonPath("$.code").value("STALE_CONCURRENCY_TOKEN"));
@@ -184,7 +184,7 @@ class NotificationControllerTest {
         when(notificationService.softDeleteNotification(REFERENCE))
             .thenReturn(aggregate(NotificationStatus.DELETED));
 
-        mockMvc.perform(post("/notifications/{ref}/soft-delete", REFERENCE))
+        mockMvc.perform(post("/notifications/{referenceNumber}/soft-delete", REFERENCE))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("DELETED"));
     }
@@ -222,7 +222,7 @@ class NotificationControllerTest {
         when(notificationService.findFulfilmentsView(REFERENCE))
             .thenThrow(new NotFoundException("Cannot find notification with reference number: " + REFERENCE));
 
-        mockMvc.perform(get("/notifications/{ref}/fulfilments", REFERENCE))
+        mockMvc.perform(get("/notifications/{referenceNumber}/fulfilments", REFERENCE))
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.detail").value(
                 "Cannot find notification with reference number: " + REFERENCE));
