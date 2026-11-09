@@ -536,6 +536,18 @@ class NotificationServiceTest {
     }
 
     @Test
+    void saveNotification_shouldLogOnlyTheSavedReference_whenCreating() {
+        repositoryEchoesSaves();
+        List<NotificationAggregate> created = new ArrayList<>();
+
+        List<String> messages = messagesLoggedDuring(
+            () -> created.add(notificationService.saveNotification(NotificationDto.builder().build())));
+
+        assertThat(messages).containsExactly(
+            "Notification saved with reference number: " + created.getFirst().getReferenceNumber());
+    }
+
+    @Test
     void replace_shouldLogOnlyTheUpdate_whenTheStatusStaysTheSame() {
         when(notificationRepository.findByReferenceNumber(REFERENCE))
             .thenReturn(Optional.of(stored(NotificationStatus.DRAFT)));

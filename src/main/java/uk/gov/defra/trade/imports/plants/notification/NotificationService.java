@@ -234,7 +234,7 @@ public class NotificationService {
         notificationAggregate.setStatus(targetStatus);
         notificationAggregate.setUpdated(clock.instant());
         NotificationAggregate saved = notificationRepository.save(notificationAggregate);
-        if (previousStatus != targetStatus) {
+        if (previousStatus != null && previousStatus != targetStatus) {
             log.info("Notification {} status changed from {} to {}",
                 saved.getReferenceNumber(), previousStatus, targetStatus);
         }
@@ -317,7 +317,6 @@ public class NotificationService {
     private NotificationAggregate createNotification(NotificationDto dto) {
         NotificationAggregate notificationAggregate = new NotificationAggregate();
         notificationAggregate.setCreated(clock.instant());
-        notificationAggregate.setStatus(NotificationStatus.DRAFT);
         stampExpiry(notificationAggregate);
         replaceFulfilmentsEnsuringNotification(dto, notificationAggregate);
         int maxAttempts = 3;
