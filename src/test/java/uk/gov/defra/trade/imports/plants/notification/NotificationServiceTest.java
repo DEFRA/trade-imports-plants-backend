@@ -47,6 +47,7 @@ class NotificationServiceTest {
     private static final String REFERENCE = "26-ABC123";
     private static final Integer NO_TTL_DAYS = null;
     private static final AuditContext AUDIT_CONTEXT = new AuditContext("trace-1", "user-1");
+    private static final Instant ORIGINAL_SUBMITTED_AT = Instant.parse("2026-07-14T10:30:15Z");
 
     @Mock
     private NotificationRepository notificationRepository;
@@ -369,18 +370,22 @@ class NotificationServiceTest {
             .hasMessageContaining("Cannot amend notification with status: DRAFT");
     }
 
-    @Test
-    void cancelAmendNotification_shouldRestoreTheBaselineAndPreserveSubmittedAt() {
-        Instant originalSubmittedAt = Instant.now().minus(2, ChronoUnit.DAYS);
+    private NotificationAggregate repositoryHoldsAnAmendmentWithBaselines() {
         NotificationAggregate amending = stored(NotificationStatus.AMEND);
-        amending.setSubmittedAt(originalSubmittedAt);
+        amending.setSubmittedAt(ORIGINAL_SUBMITTED_AT);
         amending.setFulfilments(List.of(new Document("k", "edited")));
-        Notification editedContent = amending.getNotification();
-        Notification baseline = new Notification();
-        amending.setSubmittedNotificationBaseline(baseline);
+        amending.setSubmittedNotificationBaseline(new Notification());
         amending.setSubmittedFulfilmentsBaseline(List.of(new Document("k", "submitted")));
         repositoryHolds(amending);
         repositoryEchoesSaves();
+        return amending;
+    }
+
+    @Test
+    void cancelAmendNotification_shouldReturnToSubmittedWithTheBaselineContentAndFulfilments() {
+        NotificationAggregate amending = repositoryHoldsAnAmendmentWithBaselines();
+        Notification editedContent = amending.getNotification();
+        Notification baseline = amending.getSubmittedNotificationBaseline();
 
         NotificationAggregate result = notificationService.cancelAmendNotification(REFERENCE);
 
@@ -390,9 +395,25 @@ class NotificationServiceTest {
             .isNotSameAs(baseline)
             .isNotSameAs(editedContent);
         assertThat(result.getFulfilments()).containsExactly(new Document("k", "submitted"));
+    }
+
+    @Test
+    void cancelAmendNotification_shouldClearBothBaselines() {
+        repositoryHoldsAnAmendmentWithBaselines();
+
+        NotificationAggregate result = notificationService.cancelAmendNotification(REFERENCE);
+
         assertThat(result.getSubmittedNotificationBaseline()).isNull();
         assertThat(result.getSubmittedFulfilmentsBaseline()).isNull();
-        assertThat(result.getSubmittedAt()).isEqualTo(originalSubmittedAt);
+    }
+
+    @Test
+    void cancelAmendNotification_shouldKeepTheSubmittedAtOfTheSubmissionItReturnsTo() {
+        repositoryHoldsAnAmendmentWithBaselines();
+
+        NotificationAggregate result = notificationService.cancelAmendNotification(REFERENCE);
+
+        assertThat(result.getSubmittedAt()).isEqualTo(ORIGINAL_SUBMITTED_AT);
     }
 
     @Test
@@ -512,11 +533,7 @@ class NotificationServiceTest {
 
     @Test
     void cancelAmendNotification_shouldLogTheStatusChange() {
-        NotificationAggregate amending = stored(NotificationStatus.AMEND);
-        amending.setSubmittedNotificationBaseline(new Notification());
-        amending.setSubmittedFulfilmentsBaseline(List.of(new Document("k", "submitted")));
-        repositoryHolds(amending);
-        repositoryEchoesSaves();
+        repositoryHoldsAnAmendmentWithBaselines();
 
         List<String> messages = messagesLoggedDuring(() -> notificationService.cancelAmendNotification(REFERENCE));
 
