@@ -30,7 +30,7 @@ import uk.gov.defra.trade.imports.plants.exceptions.NotFoundException;
 /**
  * Owns the notification lifecycle: the DRAFT / SUBMITTED / AMEND / DELETED status machine,
  * optimistic concurrency on {@code concurrencyToken}, reference-number generation with retry,
- * amend baselines, non-prod expiry stamping and the admin delete paths.
+ * amend baselines, non-prod expiry stamping and hard deletion with an audit record.
  */
 @Service
 @Slf4j
