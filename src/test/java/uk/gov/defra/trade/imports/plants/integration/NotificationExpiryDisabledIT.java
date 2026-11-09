@@ -10,13 +10,17 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.test.context.TestPropertySource;
 
-@TestPropertySource(properties = "spring.data.mongodb.database=notification-expiry-disabled-it")
+@TestPropertySource(
+    properties = {
+      "notification.ttl.expiry.enabled=false",
+      "spring.data.mongodb.database=notification-expiry-disabled-it"
+    })
 class NotificationExpiryDisabledIT extends IntegrationBase {
 
   @Autowired private MongoTemplate mongoTemplate;
 
   @Test
-  void startup_shouldLeaveNotificationsWithNoIndexOnExpireAt_whenExpiryIsUnconfigured() {
+  void startup_shouldLeaveNotificationsWithNoIndexOnExpireAt_whenExpiryIsDisabled() {
     List<Document> indexes = expireAtIndexes(mongoTemplate);
 
     assertThat(indexes).isEmpty();
