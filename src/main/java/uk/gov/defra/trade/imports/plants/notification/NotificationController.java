@@ -28,9 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * Notification endpoints for the plants journey.
  *
- * <p>Write requests may carry an {@link ActorRequest}; it is accepted so the frontend's wire
- * contract is stable across journeys, but nothing consumes it until this service publishes
- * events.
+ * <p>Write requests may carry an {@link ActorRequest}, which is ignored.
  */
 @RestController
 @RequestMapping("/notifications")
