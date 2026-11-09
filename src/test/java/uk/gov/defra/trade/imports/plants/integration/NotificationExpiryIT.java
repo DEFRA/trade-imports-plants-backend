@@ -85,7 +85,7 @@ class NotificationExpiryIT extends IntegrationBase {
   void expiredNotifications_shouldBeRemovedByMongo_whileUndatedAndUnexpiredOnesStay() {
     String expiredReference = "26-EXP001";
     String undatedReference = "26-UND001";
-    String unexpiredReference = "26-ACT001";
+    String unexpiredReference = "26-UNE001";
     saveNotification(expiredReference, Instant.now().minus(1, ChronoUnit.HOURS));
     saveNotification(undatedReference, null);
     saveNotification(unexpiredReference, Instant.now().plus(7, ChronoUnit.DAYS));
