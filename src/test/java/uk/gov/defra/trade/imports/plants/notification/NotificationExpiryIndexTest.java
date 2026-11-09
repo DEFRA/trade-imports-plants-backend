@@ -73,25 +73,28 @@ class NotificationExpiryIndexTest {
         });
   }
 
+  private static MongoCommandException unauthorizedDropIndexes() {
+    BsonDocument response = new BsonDocument()
+        .append("ok", new BsonDouble(0.0))
+        .append("code", new BsonInt32(13))
+        .append("codeName", new BsonString("Unauthorized"))
+        .append("errmsg", new BsonString("not authorized to execute command dropIndexes"));
+    return new MongoCommandException(response, new ServerAddress());
+  }
+
   @Test
   void replacePlainExpireAtIndexWithTtlIndex_shouldFail_whenDroppingThePlainIndexFailsForAnotherReason() {
-    MongoCommandException writeConflict = new MongoCommandException(
-        new BsonDocument()
-            .append("ok", new BsonDouble(0.0))
-            .append("code", new BsonInt32(112))
-            .append("codeName", new BsonString("WriteConflict"))
-            .append("errmsg", new BsonString("write conflict")),
-        new ServerAddress());
+    MongoCommandException dropFailure = unauthorizedDropIndexes();
     IndexOperations indexOps = mock(IndexOperations.class);
     when(indexOps.getIndexInfo()).thenReturn(List.of(new IndexInfo(
         List.of(IndexField.create("expireAt", Sort.Direction.ASC)), "expireAt", false, false, "")));
-    doThrow(new UncategorizedMongoDbException("drop failed", writeConflict))
+    doThrow(new UncategorizedMongoDbException("drop failed", dropFailure))
         .when(indexOps).dropIndex("expireAt");
     MongoTemplate mongoTemplate = mock(MongoTemplate.class);
     when(mongoTemplate.indexOps(NotificationAggregate.class)).thenReturn(indexOps);
     NotificationExpiryIndex expiryIndex =
         new NotificationExpiryIndex(mongoTemplate, new NotificationTtlConfig(null, "dev"));
 
-    assertThatThrownBy(expiryIndex::replacePlainExpireAtIndexWithTtlIndex).hasCause(writeConflict);
+    assertThatThrownBy(expiryIndex::replacePlainExpireAtIndexWithTtlIndex).hasCause(dropFailure);
   }
 }
