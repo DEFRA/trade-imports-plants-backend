@@ -69,6 +69,8 @@ management:
   health:
     mongo:
       enabled: false
+  # Keeps the EMF metrics publisher off: tests have no CloudWatch agent and a blank
+  # namespace, which fails every scheduled publish.
   metrics:
     enabled: false
 
