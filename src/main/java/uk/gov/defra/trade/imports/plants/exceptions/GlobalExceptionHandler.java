@@ -175,7 +175,6 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(ForbiddenException.class)
   public ProblemDetail handleForbiddenException(ForbiddenException ex) {
     String traceId = MDC.get(MDC_TRACE_ID);
-    log.warn("Forbidden (trace: {})", traceId, ex);
 
     ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(
         HttpStatus.FORBIDDEN,

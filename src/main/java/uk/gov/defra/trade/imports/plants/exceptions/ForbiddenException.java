@@ -1,8 +1,6 @@
 package uk.gov.defra.trade.imports.plants.exceptions;
 
-/**
- * Caller is authenticated and scoped, but not permitted to access the resource (403).
- */
+/** Thrown when the requested resource belongs to an organisation other than the caller's. */
 public class ForbiddenException extends TradeImportsPlantsBackendException {
 
     public ForbiddenException(String message) {
