@@ -28,6 +28,7 @@ import uk.gov.defra.trade.imports.plants.audit.Result;
 import uk.gov.defra.trade.imports.plants.notification.NotificationAggregate;
 import uk.gov.defra.trade.imports.plants.notification.NotificationReferenceOnly;
 import uk.gov.defra.trade.imports.plants.notification.NotificationRepository;
+import uk.gov.defra.trade.imports.plants.testsupport.TraderOrganisationTestSupport;
 import uk.gov.defra.trade.imports.plants.notification.NotificationSort;
 import uk.gov.defra.trade.imports.plants.notification.NotificationStatus;
 
@@ -126,6 +127,7 @@ class PersistedTimestampZoneIT extends IntegrationBase {
         // Given
         mongoTemplate.getCollection(NOTIFICATION_COLLECTION).insertOne(new Document()
             .append("referenceNumber", REF)
+            .append("organisationId", TraderOrganisationTestSupport.ORGANISATION_ID)
             .append("status", NotificationStatus.SUBMITTED.name())
             .append("created", Date.from(CREATED))
             .append("updated", Date.from(SUBMITTED_AT))
@@ -133,7 +135,9 @@ class PersistedTimestampZoneIT extends IntegrationBase {
             .append("expireAt", Date.from(EXPIRE_AT)));
 
         // When
-        NotificationAggregate read = notificationRepository.findByReferenceNumber(REF).orElseThrow();
+        NotificationAggregate read = notificationRepository
+            .findByReferenceNumberAndOrganisationId(REF, TraderOrganisationTestSupport.ORGANISATION_ID)
+            .orElseThrow();
 
         // Then — every field comes back as the instant the stored BSON date names
         assertThat(read.getCreated()).isEqualTo(CREATED);
@@ -229,7 +233,9 @@ class PersistedTimestampZoneIT extends IntegrationBase {
             .build());
 
         // When
-        NotificationAggregate read = notificationRepository.findByReferenceNumber(REF).orElseThrow();
+        NotificationAggregate read = notificationRepository
+            .findByReferenceNumberAndOrganisationId(REF, TraderOrganisationTestSupport.ORGANISATION_ID)
+            .orElseThrow();
 
         // Then
         assertThat(read.getFulfilments().getFirst()).containsEntry("arrivalDate", dateShaped);

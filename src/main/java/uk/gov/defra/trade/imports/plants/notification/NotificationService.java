@@ -122,11 +122,12 @@ public class NotificationService {
         return createNotification(notificationCopyMapper.toCopyDto(source), organisationId);
     }
 
-    public NotificationPageResponse findAll(int page, String sort, String organisationId) {
-        return findAll(page, sort, null, organisationId);
-    }
-
-    /** Serves {@code GET /notifications/{ref}/fulfilments} — the frontend engine's rehydrate read. */
+    /**
+     * Returns the fulfilment view for a notification owned by the caller's organisation.
+     *
+     * @throws ForbiddenException when the reference exists under another organisation
+     * @throws NotFoundException when no notification exists with the reference
+     */
     public NotificationFulfilmentsView findFulfilmentsView(String referenceNumber, String organisationId) {
         Optional<NotificationFulfilmentsView> scoped =
             notificationRepository.findFulfilmentsViewByReferenceNumberAndOrganisationId(
@@ -135,10 +136,6 @@ public class NotificationService {
             return scoped.get();
         }
         if (notificationRepository.existsByReferenceNumber(referenceNumber)) {
-            log.warn(
-                "Fulfilment read denied for referenceNumber={} organisationId={}",
-                referenceNumber,
-                organisationId);
             throw new ForbiddenException(
                 "Cannot read fulfilments for notification with reference number: "
                     + referenceNumber + " organisationId: " + organisationId);
@@ -229,21 +226,9 @@ public class NotificationService {
         notificationAggregate.setFulfilments(
             Fulfilments.deepCopy(notificationAggregate.getSubmittedFulfilmentsBaseline()));
         notificationAggregate.setSubmittedFulfilmentsBaseline(null);
-        // submittedAt is deliberately NOT reset — reverting to the previously-submitted state
-        // preserves the original submission timestamp.
         return write(notificationAggregate, NotificationStatus.SUBMITTED, false);
     }
 
-    /**
-     * Applies a status transition and persists. Submitting out of AMEND discards the amend
-     * baselines; only an actual submission stamps {@code submittedAt}, so a cancel-amend that
-     * lands back on SUBMITTED keeps the original submission timestamp.
-     *
-     * @param notification   the aggregate to persist
-     * @param targetStatus   the status to move to
-     * @param isSubmission   whether this write is a submission (and so mints a new {@code submittedAt})
-     * @return the persisted aggregate, with its incremented concurrency token
-     */
     private NotificationAggregate write(NotificationAggregate notification,
         NotificationStatus targetStatus, boolean isSubmission) {
         if (targetStatus == NotificationStatus.SUBMITTED
@@ -264,7 +249,6 @@ public class NotificationService {
     public NotificationAggregate softDeleteNotification(String referenceNumber, String organisationId) {
         NotificationAggregate notificationAggregate =
             requireTraderNotification(referenceNumber, organisationId);
-        // Idempotent per REST DELETE convention — a repeat call after a lost response is a no-op.
         if (notificationAggregate.getStatus() == NotificationStatus.DELETED) {
             return notificationAggregate;
         }
@@ -317,15 +301,7 @@ public class NotificationService {
         createNotificationAuditRecord(referenceNumbers, auditContext, Result.SUCCESS);
     }
 
-    /**
-     * Deletes notifications whose {@code expireAt} has passed, up to {@code batchSize} per call.
-     * Called by the non-prod {@code NotificationExpirySweeper}; unlike
-     * {@link #deleteByReferenceNumbers} it writes no audit record. Notifications with a
-     * {@code null} {@code expireAt} are never selected.
-     *
-     * @param batchSize maximum number of notifications to remove in this run
-     * @return the number of notifications deleted
-     */
+    /** Deletes notifications whose {@code expireAt} has passed, up to {@code batchSize} per call. */
     @Transactional
     public int deleteExpired(int batchSize) {
         List<NotificationReferenceOnly> due =
@@ -341,12 +317,6 @@ public class NotificationService {
         return referenceNumbers.size();
     }
 
-    /**
-     * Stamps {@code expireAt} on a freshly-created notification, but only when both prod safeguards
-     * pass: a TTL duration is configured (non-prod config) and the running environment is not prod.
-     * Anchored to {@code created}, so a notification expires a fixed window after creation
-     * regardless of later activity.
-     */
     private void stampExpiry(NotificationAggregate notificationAggregate) {
         Integer days = ttlConfig.days();
         if (days == null || ttlConfig.isProd()) {

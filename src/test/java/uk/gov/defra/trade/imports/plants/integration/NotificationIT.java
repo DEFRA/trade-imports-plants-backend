@@ -15,13 +15,18 @@ import java.util.List;
 import org.bson.Document;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+import java.util.stream.Stream;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MvcResult;
 import uk.gov.defra.trade.imports.plants.audit.AuditRepository;
 import uk.gov.defra.trade.imports.plants.audit.Result;
 import uk.gov.defra.trade.imports.plants.notification.NotificationAggregate;
+import uk.gov.defra.trade.imports.plants.filter.TraderOrganisationHeaderFilter;
 import uk.gov.defra.trade.imports.plants.notification.NotificationController;
+import uk.gov.defra.trade.imports.plants.testsupport.TraderOrganisationTestSupport;
 import uk.gov.defra.trade.imports.plants.notification.NotificationDto;
 import uk.gov.defra.trade.imports.plants.notification.NotificationRepository;
 import uk.gov.defra.trade.imports.plants.notification.NotificationStatus;
@@ -35,8 +40,8 @@ import uk.gov.defra.trade.imports.plants.notification.SaveNotificationDto;
  */
 class NotificationIT extends IntegrationBase {
 
-    private static final String ORG_ID = "5900002";
-    private static final String OTHER_ORG_ID = "9999999";
+    private static final String ORGANISATION_ID = TraderOrganisationTestSupport.ORGANISATION_ID;
+    private static final String OTHER_ORGANISATION_ID = TraderOrganisationTestSupport.OTHER_ORGANISATION_ID;
 
     /** An RFC 3339 instant in UTC: a date, a time, optional fractional seconds and a {@code Z}. */
     private static final String UTC_INSTANT =
@@ -59,7 +64,7 @@ class NotificationIT extends IntegrationBase {
 
     private NotificationAggregate createDraft(List<Document> fulfilments) throws Exception {
         MvcResult result = mockMvc.perform(post("/notifications")
-                .header(NotificationController.HEADER_ORGANISATION_ID, ORG_ID)
+                .header(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER, ORGANISATION_ID)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(SaveNotificationDto.of(
                     NotificationDto.builder().fulfilments(fulfilments).build()))))
@@ -77,8 +82,8 @@ class NotificationIT extends IntegrationBase {
         // Then
         assertThat(created.getReferenceNumber()).matches(ReferenceNumberGenerator.REFERENCE_NUMBER_PATTERN);
         assertThat(created.getStatus()).isEqualTo(NotificationStatus.DRAFT);
-        assertThat(created.getOrganisationId()).isEqualTo(ORG_ID);
-        assertThat(notificationRepository.findByReferenceNumber(created.getReferenceNumber()))
+        assertThat(created.getOrganisationId()).isEqualTo(ORGANISATION_ID);
+        assertThat(notificationRepository.findByReferenceNumberAndOrganisationId(created.getReferenceNumber(), ORGANISATION_ID))
             .isPresent();
     }
 
@@ -96,7 +101,7 @@ class NotificationIT extends IntegrationBase {
 
         // Then — read back through the fulfilments-view projection the frontend engine uses
         mockMvc.perform(get("/notifications/{ref}/fulfilments", created.getReferenceNumber())
-                .header(NotificationController.HEADER_ORGANISATION_ID, ORG_ID))
+                .header(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER, ORGANISATION_ID))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.referenceNumber").value(created.getReferenceNumber()))
             .andExpect(jsonPath("$.status").value("DRAFT"))
@@ -111,7 +116,7 @@ class NotificationIT extends IntegrationBase {
         // Given a draft that has already been updated once
         NotificationAggregate created = createDraft(List.of());
         mockMvc.perform(put("/notifications/{ref}", created.getReferenceNumber())
-                .header(NotificationController.HEADER_ORGANISATION_ID, ORG_ID)
+                .header(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER, ORGANISATION_ID)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(SaveNotificationDto.of(
                     NotificationDto.builder()
@@ -122,7 +127,7 @@ class NotificationIT extends IntegrationBase {
 
         // When a second writer replays the original token
         mockMvc.perform(put("/notifications/{ref}", created.getReferenceNumber())
-                .header(NotificationController.HEADER_ORGANISATION_ID, ORG_ID)
+                .header(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER, ORGANISATION_ID)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(SaveNotificationDto.of(
                     NotificationDto.builder()
@@ -140,10 +145,10 @@ class NotificationIT extends IntegrationBase {
         NotificationAggregate created = createDraft(List.of(new Document("k", "submitted")));
         String reference = created.getReferenceNumber();
         mockMvc.perform(post("/notifications/{ref}/submit", reference)
-                .header(NotificationController.HEADER_ORGANISATION_ID, ORG_ID)).andExpect(status().isOk());
+                .header(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER, ORGANISATION_ID)).andExpect(status().isOk());
 
         MvcResult amended = mockMvc.perform(post("/notifications/{ref}/amend", reference)
-                .header(NotificationController.HEADER_ORGANISATION_ID, ORG_ID))
+                .header(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER, ORGANISATION_ID))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("AMEND"))
             .andReturn();
@@ -152,7 +157,7 @@ class NotificationIT extends IntegrationBase {
 
         // When the amendment edits the payload and is then cancelled
         mockMvc.perform(put("/notifications/{ref}", reference)
-                .header(NotificationController.HEADER_ORGANISATION_ID, ORG_ID)
+                .header(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER, ORGANISATION_ID)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(SaveNotificationDto.of(
                     NotificationDto.builder()
@@ -162,12 +167,12 @@ class NotificationIT extends IntegrationBase {
             .andExpect(status().isOk());
 
         mockMvc.perform(post("/notifications/{ref}/cancel-amend", reference)
-                .header(NotificationController.HEADER_ORGANISATION_ID, ORG_ID))
+                .header(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER, ORGANISATION_ID))
             .andExpect(status().isOk());
 
         // Then the pre-amend payload is back and the baselines are cleared
         NotificationAggregate restored =
-            notificationRepository.findByReferenceNumber(reference).orElseThrow();
+            notificationRepository.findByReferenceNumberAndOrganisationId(reference, ORGANISATION_ID).orElseThrow();
         assertThat(restored.getStatus()).isEqualTo(NotificationStatus.SUBMITTED);
         assertThat(restored.getFulfilments()).containsExactly(new Document("k", "submitted"));
         assertThat(restored.getSubmittedNotificationBaseline()).isNull();
@@ -182,7 +187,7 @@ class NotificationIT extends IntegrationBase {
 
         // When
         MvcResult result = mockMvc.perform(post("/notifications/{ref}/copy", created.getReferenceNumber())
-                .header(NotificationController.HEADER_ORGANISATION_ID, ORG_ID)
+                .header(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER, ORGANISATION_ID)
                 .param("concurrencyToken", String.valueOf(created.getConcurrencyToken())))
             .andExpect(status().isOk())
             .andReturn();
@@ -195,6 +200,7 @@ class NotificationIT extends IntegrationBase {
             .isNotEqualTo(created.getReferenceNumber());
         assertThat(copy.getStatus()).isEqualTo(NotificationStatus.DRAFT);
         assertThat(copy.getFulfilments()).containsExactly(new Document("k", "v"));
+        assertThat(copy.getOrganisationId()).isEqualTo(ORGANISATION_ID);
     }
 
     @Test
@@ -202,19 +208,19 @@ class NotificationIT extends IntegrationBase {
         // Given — a draft has no submission timestamp to carry
         NotificationAggregate created = createDraft(List.of());
         mockMvc.perform(get("/notifications")
-                .header(NotificationController.HEADER_ORGANISATION_ID, ORG_ID))
+                .header(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER, ORGANISATION_ID))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.content[0].status").value("DRAFT"))
             .andExpect(jsonPath("$.content[0].submittedAt").isEmpty());
 
         // When
         mockMvc.perform(post("/notifications/{ref}/submit", created.getReferenceNumber())
-                .header(NotificationController.HEADER_ORGANISATION_ID, ORG_ID))
+                .header(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER, ORGANISATION_ID))
             .andExpect(status().isOk());
 
         // Then — the list projection loads submittedAt from the aggregate, not just the single read
         mockMvc.perform(get("/notifications")
-                .header(NotificationController.HEADER_ORGANISATION_ID, ORG_ID))
+                .header(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER, ORGANISATION_ID))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.content[0].status").value("SUBMITTED"))
             .andExpect(jsonPath("$.content[0].submittedAt").isNotEmpty());
@@ -224,7 +230,7 @@ class NotificationIT extends IntegrationBase {
     void timestamps_shouldBeRfc3339InstantsWithAZSuffix_inEveryResponse() throws Exception {
         // Given / When — the write response
         MvcResult saved = mockMvc.perform(post("/notifications")
-                .header(NotificationController.HEADER_ORGANISATION_ID, ORG_ID)
+                .header(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER, ORGANISATION_ID)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(SaveNotificationDto.of(
                     NotificationDto.builder().fulfilments(List.of()).build()))))
@@ -236,7 +242,7 @@ class NotificationIT extends IntegrationBase {
             saved.getResponse().getContentAsString(), NotificationAggregate.class).getReferenceNumber();
 
         mockMvc.perform(post("/notifications/{ref}/submit", reference)
-                .header(NotificationController.HEADER_ORGANISATION_ID, ORG_ID))
+                .header(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER, ORGANISATION_ID))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.created", matchesPattern(UTC_INSTANT)))
             .andExpect(jsonPath("$.updated", matchesPattern(UTC_INSTANT)))
@@ -244,12 +250,12 @@ class NotificationIT extends IntegrationBase {
 
         // Then — the two read projections
         mockMvc.perform(get("/notifications")
-                .header(NotificationController.HEADER_ORGANISATION_ID, ORG_ID))
+                .header(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER, ORGANISATION_ID))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.content[0].created", matchesPattern(UTC_INSTANT)))
             .andExpect(jsonPath("$.content[0].submittedAt", matchesPattern(UTC_INSTANT)));
         mockMvc.perform(get("/notifications/{ref}/fulfilments", reference)
-                .header(NotificationController.HEADER_ORGANISATION_ID, ORG_ID))
+                .header(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER, ORGANISATION_ID))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.created", matchesPattern(UTC_INSTANT)))
             .andExpect(jsonPath("$.submittedAt", matchesPattern(UTC_INSTANT)));
@@ -259,7 +265,7 @@ class NotificationIT extends IntegrationBase {
     void post_shouldReturn400_whenTheBodyIsNotWellFormedJson() throws Exception {
         // When / Then
         mockMvc.perform(post("/notifications")
-                .header(NotificationController.HEADER_ORGANISATION_ID, ORG_ID)
+                .header(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER, ORGANISATION_ID)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"notification\":"))
             .andExpect(status().isBadRequest())
@@ -273,21 +279,21 @@ class NotificationIT extends IntegrationBase {
         // Given
         NotificationAggregate created = createDraft(List.of());
         mockMvc.perform(get("/notifications")
-                .header(NotificationController.HEADER_ORGANISATION_ID, ORG_ID))
+                .header(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER, ORGANISATION_ID))
             .andExpect(jsonPath("$.totalElements").value(1));
 
         // When
         mockMvc.perform(post("/notifications/{ref}/soft-delete", created.getReferenceNumber())
-                .header(NotificationController.HEADER_ORGANISATION_ID, ORG_ID))
+                .header(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER, ORGANISATION_ID))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("DELETED"));
 
         // Then — the row is retained but no longer listed
         mockMvc.perform(get("/notifications")
-                .header(NotificationController.HEADER_ORGANISATION_ID, ORG_ID))
+                .header(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER, ORGANISATION_ID))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.totalElements").value(0));
-        assertThat(notificationRepository.findByReferenceNumber(created.getReferenceNumber()))
+        assertThat(notificationRepository.findByReferenceNumberAndOrganisationId(created.getReferenceNumber(), ORGANISATION_ID))
             .isPresent();
     }
 
@@ -305,7 +311,7 @@ class NotificationIT extends IntegrationBase {
             .andExpect(status().isNoContent());
 
         // Then
-        assertThat(notificationRepository.findByReferenceNumber(created.getReferenceNumber()))
+        assertThat(notificationRepository.findByReferenceNumberAndOrganisationId(created.getReferenceNumber(), ORGANISATION_ID))
             .isEmpty();
         assertThat(auditRepository.findAll())
             .singleElement()
@@ -332,7 +338,7 @@ class NotificationIT extends IntegrationBase {
             .andExpect(status().isNotFound());
 
         // Then
-        assertThat(notificationRepository.findByReferenceNumber(created.getReferenceNumber()))
+        assertThat(notificationRepository.findByReferenceNumberAndOrganisationId(created.getReferenceNumber(), ORGANISATION_ID))
             .isPresent();
         assertThat(auditRepository.findAll())
             .singleElement()
@@ -360,58 +366,81 @@ class NotificationIT extends IntegrationBase {
     }
 
     @Test
-    void organisationScope_shouldHideNotificationFromOtherOrganisation() throws Exception {
+    void organisationScope_list_shouldExcludeOtherOrganisationsNotifications() throws Exception {
         NotificationAggregate created = createDraft(List.of());
         mockMvc.perform(post("/notifications/{ref}/submit", created.getReferenceNumber())
-                .header(NotificationController.HEADER_ORGANISATION_ID, ORG_ID))
+                .header(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER, ORGANISATION_ID))
             .andExpect(status().isOk());
 
-        mockMvc.perform(get("/notifications/{ref}/fulfilments", created.getReferenceNumber())
-                .header(NotificationController.HEADER_ORGANISATION_ID, OTHER_ORG_ID))
-            .andExpect(status().isForbidden());
-
         mockMvc.perform(get("/notifications")
-                .header(NotificationController.HEADER_ORGANISATION_ID, OTHER_ORG_ID))
+                .header(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER, OTHER_ORGANISATION_ID))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.totalElements").value(0));
-
-        mockMvc.perform(post("/notifications/{ref}/amend", created.getReferenceNumber())
-                .header(NotificationController.HEADER_ORGANISATION_ID, OTHER_ORG_ID))
-            .andExpect(status().isNotFound());
-
-        NotificationAggregate submitted =
-            notificationRepository.findByReferenceNumber(created.getReferenceNumber()).orElseThrow();
-        String reference = submitted.getReferenceNumber();
-        Long concurrencyToken = submitted.getConcurrencyToken();
-
-        mockMvc.perform(put("/notifications/{ref}", reference)
-                .header(NotificationController.HEADER_ORGANISATION_ID, OTHER_ORG_ID)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(SaveNotificationDto.of(
-                    NotificationDto.builder().concurrencyToken(concurrencyToken).build()))))
-            .andExpect(status().isNotFound());
-
-        mockMvc.perform(post("/notifications/{ref}/submit", reference)
-                .header(NotificationController.HEADER_ORGANISATION_ID, OTHER_ORG_ID)
-                .param("concurrencyToken", String.valueOf(concurrencyToken)))
-            .andExpect(status().isNotFound());
-
-        mockMvc.perform(post("/notifications/{ref}/copy", reference)
-                .header(NotificationController.HEADER_ORGANISATION_ID, OTHER_ORG_ID)
-                .param("concurrencyToken", String.valueOf(concurrencyToken)))
-            .andExpect(status().isNotFound());
-
-        mockMvc.perform(post("/notifications/{ref}/soft-delete", reference)
-                .header(NotificationController.HEADER_ORGANISATION_ID, OTHER_ORG_ID))
-            .andExpect(status().isNotFound());
     }
 
     @Test
-    void traderRoutes_shouldRejectRequestsWithoutOrganisationHeader() throws Exception {
-        mockMvc.perform(post("/notifications")
+    void fulfilments_shouldReturn403_forAnotherOrganisation() throws Exception {
+        NotificationAggregate created = createDraft(List.of());
+        mockMvc.perform(post("/notifications/{ref}/submit", created.getReferenceNumber())
+                .header(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER, ORGANISATION_ID))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(get("/notifications/{ref}/fulfilments", created.getReferenceNumber())
+                .header(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER, OTHER_ORGANISATION_ID))
+            .andExpect(status().isForbidden());
+    }
+
+    @ParameterizedTest
+    @MethodSource("crossOrganisationWriteRoutes")
+    void writes_shouldReturn404_forAnotherOrganisation(String routeTemplate) throws Exception {
+        NotificationAggregate created = createDraft(List.of());
+        mockMvc.perform(post("/notifications/{ref}/submit", created.getReferenceNumber())
+                .header(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER, ORGANISATION_ID))
+            .andExpect(status().isOk());
+
+        NotificationAggregate submitted =
+            notificationRepository.findByReferenceNumberAndOrganisationId(
+                created.getReferenceNumber(), ORGANISATION_ID).orElseThrow();
+        String reference = submitted.getReferenceNumber();
+        Long concurrencyToken = submitted.getConcurrencyToken();
+
+        var request = switch (routeTemplate) {
+            case "amend" -> post("/notifications/{ref}/amend", reference);
+            case "put" -> put("/notifications/{ref}", reference)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(SaveNotificationDto.of(
-                    NotificationDto.builder().build()))))
-            .andExpect(status().isBadRequest());
+                    NotificationDto.builder().concurrencyToken(concurrencyToken).build())));
+            case "submit" -> post("/notifications/{ref}/submit", reference);
+            case "copy" -> post("/notifications/{ref}/copy", reference)
+                .param("concurrencyToken", String.valueOf(concurrencyToken));
+            case "soft-delete" -> post("/notifications/{ref}/soft-delete", reference);
+            default -> throw new IllegalArgumentException(routeTemplate);
+        };
+
+        mockMvc.perform(request.header(
+                TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER, OTHER_ORGANISATION_ID))
+            .andExpect(status().isNotFound());
+    }
+
+    static Stream<String> crossOrganisationWriteRoutes() {
+        return Stream.of("amend", "put", "submit", "copy", "soft-delete");
+    }
+
+    @ParameterizedTest
+    @MethodSource("traderRoutesWithoutOrganisationHeader")
+    void traderRoutes_shouldRejectRequestsWithoutOrganisationHeader(
+        org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder request)
+        throws Exception {
+        mockMvc.perform(request)
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.detail")
+                .value("Missing required header Trade-Imports-Organisation-Id"));
+    }
+
+    static Stream<org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder>
+        traderRoutesWithoutOrganisationHeader() {
+        return Stream.of(
+            get("/notifications"),
+            post("/notifications"));
     }
 }
