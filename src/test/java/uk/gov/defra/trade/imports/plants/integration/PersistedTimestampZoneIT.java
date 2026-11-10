@@ -227,6 +227,7 @@ class PersistedTimestampZoneIT extends IntegrationBase {
         String dateShaped = "2026-07-21";
         notificationRepository.save(NotificationAggregate.builder()
             .referenceNumber(REF)
+            .organisationId(TraderOrganisationTestSupport.ORGANISATION_ID)
             .status(NotificationStatus.DRAFT)
             .created(CREATED)
             .fulfilments(List.of(new Document("arrivalDate", dateShaped)))
