@@ -12,24 +12,23 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface NotificationRepository extends MongoRepository<NotificationAggregate, String> {
 
-    Optional<NotificationAggregate> findByReferenceNumber(String referenceNumber);
+    boolean existsByReferenceNumber(String referenceNumber);
+
+    Optional<NotificationAggregate> findByReferenceNumberAndOrganisationId(
+        String referenceNumber, String organisationId);
 
     List<NotificationReferenceOnly> findAllByReferenceNumberIn(List<String> referenceNumbers);
 
-    Optional<NotificationFulfilmentsView> findFulfilmentsViewByReferenceNumber(String referenceNumber);
+    Optional<NotificationFulfilmentsView> findFulfilmentsViewByReferenceNumberAndOrganisationId(
+        String referenceNumber, String organisationId);
 
-    Optional<NotificationView> findViewByReferenceNumberAndStatusIn(
-        String referenceNumber, List<NotificationStatus> statuses);
+    Optional<NotificationView> findViewByReferenceNumberAndStatusInAndOrganisationId(
+        String referenceNumber, List<NotificationStatus> statuses, String organisationId);
 
-    Page<NotificationView> findAllViewByStatusIn(List<NotificationStatus> statuses, Pageable pageable);
+    Page<NotificationView> findAllViewByStatusInAndOrganisationId(
+        List<NotificationStatus> statuses, String organisationId, Pageable pageable);
 
-    /**
-     * Notifications due for automatic expiry: a non-null {@code expireAt} at or before {@code now}.
-     * The explicit {@code $ne: null} clause guarantees notifications with no {@code expireAt} are
-     * never selected. Expressed as a {@code @Query} because a derived
-     * {@code findByExpireAtNotNullAndExpireAtLessThanEqual} name puts two criteria on the same
-     * field, which Spring Data's derived-query builder rejects.
-     */
+    /** Notifications with a non-null {@code expireAt} at or before {@code now}. */
     @Query("{ 'expireAt': { $ne: null, $lte: ?0 } }")
     List<NotificationReferenceOnly> findExpired(Instant now, Pageable pageable);
 

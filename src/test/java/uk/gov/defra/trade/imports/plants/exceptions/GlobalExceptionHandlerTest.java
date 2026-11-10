@@ -306,6 +306,40 @@ class GlobalExceptionHandlerTest {
         }
     }
 
+    @Test
+    void handleForbiddenException_shouldReturnForbiddenWithDetail() {
+        String traceId = "test-trace-forbidden-1";
+        MDC.put("trace.id", traceId);
+        String detail =
+            "Cannot read fulfilments for notification with reference number: "
+                + "GBN-DP-26-ABC001 organisationId: 5900002";
+
+        ProblemDetail problemDetail =
+            exceptionHandler.handleForbiddenException(new ForbiddenException(detail));
+
+        assertThat(problemDetail).isNotNull();
+        assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.FORBIDDEN.value());
+        assertThat(problemDetail.getTitle()).isEqualTo("Forbidden");
+        assertThat(problemDetail.getDetail()).isEqualTo(detail);
+        assertThat(problemDetail.getType())
+            .isEqualTo(URI.create("https://api.cdp.defra.cloud/problems/forbidden"));
+        assertThat(problemDetail.getProperties()).containsEntry("traceId", traceId);
+    }
+
+    @Test
+    void handleForbiddenException_shouldHandleNullTraceId() {
+        ProblemDetail problemDetail =
+            exceptionHandler.handleForbiddenException(
+                new ForbiddenException("Organisation may not access this resource"));
+
+        assertThat(problemDetail).isNotNull();
+        assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.FORBIDDEN.value());
+        Map<String, Object> properties = problemDetail.getProperties();
+        assertThat(properties).satisfiesAnyOf(
+            p -> assertThat(p).isNull(),
+            p -> assertThat(p).doesNotContainKey("traceId"));
+    }
+
     private MethodArgumentNotValidException createValidationException(FieldError... fieldErrors) {
         try {
             // Create a real MethodParameter with an actual method to avoid NullPointerException
