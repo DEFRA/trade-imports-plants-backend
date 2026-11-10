@@ -367,6 +367,12 @@ class NotificationIT extends IntegrationBase {
         String reference = submitted.getReferenceNumber();
         Long concurrencyToken = submitted.getConcurrencyToken();
 
+        if ("cancel-amend".equals(routeTemplate)) {
+            mockMvc.perform(post("/notifications/{ref}/amend", reference)
+                    .header(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER, ORGANISATION_ID))
+                .andExpect(status().isOk());
+        }
+
         var request = switch (routeTemplate) {
             case "amend" -> post("/notifications/{ref}/amend", reference);
             case "put" -> put("/notifications/{ref}", reference)
@@ -376,6 +382,7 @@ class NotificationIT extends IntegrationBase {
             case "submit" -> post("/notifications/{ref}/submit", reference);
             case "copy" -> post("/notifications/{ref}/copy", reference)
                 .param("concurrencyToken", String.valueOf(concurrencyToken));
+            case "cancel-amend" -> post("/notifications/{ref}/cancel-amend", reference);
             case "soft-delete" -> post("/notifications/{ref}/soft-delete", reference);
             default -> throw new IllegalArgumentException(routeTemplate);
         };
@@ -386,7 +393,7 @@ class NotificationIT extends IntegrationBase {
     }
 
     static Stream<String> crossOrganisationWriteRoutes() {
-        return Stream.of("amend", "put", "submit", "copy", "soft-delete");
+        return Stream.of("amend", "put", "submit", "copy", "cancel-amend", "soft-delete");
     }
 
     @ParameterizedTest
