@@ -29,8 +29,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.event.EventListener;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import uk.gov.defra.trade.imports.plants.audit.Action;
@@ -569,36 +567,6 @@ class NotificationServiceTest {
             NotificationDto.builder().concurrencyToken(2L).build(), ORGANISATION_ID));
 
         assertThat(messages).containsExactly("Updating notification 26-ABC123");
-    }
-
-    @Test
-    void logExpiryStamping_shouldGiveDaysAndEnvironment_whenStampingIsOn() {
-        List<String> messages = messagesLoggedDuring(newService(ttlConfig(7, "dev"))::logExpiryStamping);
-
-        assertThat(messages).containsExactly("Notification expiry stamping is on: 7 days in environment dev");
-    }
-
-    @Test
-    void logExpiryStamping_shouldNameProdAsTheReason_whenDaysAreSetInProd() {
-        List<String> messages = messagesLoggedDuring(newService(ttlConfig(7, "prod"))::logExpiryStamping);
-
-        assertThat(messages).containsExactly("Notification expiry stamping is off: environment prod is prod");
-    }
-
-    @Test
-    void logExpiryStamping_shouldNameMissingDaysAsTheReason_whenNoDaysAreSetOutsideProd() {
-        List<String> messages = messagesLoggedDuring(newService(ttlConfig(NO_TTL_DAYS, "dev"))::logExpiryStamping);
-
-        assertThat(messages).containsExactly("Notification expiry stamping is off: no days set in environment dev");
-    }
-
-    @Test
-    void logExpiryStamping_shouldListenForTheApplicationBeingReady() throws NoSuchMethodException {
-        EventListener listener = NotificationService.class
-            .getMethod("logExpiryStamping")
-            .getAnnotation(EventListener.class);
-
-        assertThat(listener.value()).containsExactly(ApplicationReadyEvent.class);
     }
 
     private void onlyReferenceExistsAmong(List<String> requestedReferences) {

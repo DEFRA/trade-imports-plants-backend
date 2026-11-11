@@ -8,8 +8,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.event.EventListener;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.data.domain.Page;
@@ -69,23 +67,6 @@ public class NotificationService {
         this.clock = clock;
         this.listPageSize = listPageSize;
         this.adminPageSize = adminPageSize;
-    }
-
-    /**
-     * Logs once the application is ready whether new notifications get an expiry stamped in this
-     * environment and, when they do not, why.
-     */
-    @EventListener(ApplicationReadyEvent.class)
-    public void logExpiryStamping() {
-        String environment = ttlConfig.environment();
-        Optional<Integer> daysToStamp = ttlConfig.daysToStamp();
-        if (daysToStamp.isPresent()) {
-            log.info("Notification expiry stamping is on: {} days in environment {}", daysToStamp.get(), environment);
-        } else if (ttlConfig.isProd()) {
-            log.info("Notification expiry stamping is off: environment {} is prod", environment);
-        } else {
-            log.info("Notification expiry stamping is off: no days set in environment {}", environment);
-        }
     }
 
     /** Creates a notification when the DTO carries no reference number, otherwise updates that one. */
