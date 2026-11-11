@@ -25,6 +25,7 @@ import uk.gov.defra.trade.imports.plants.audit.AuditRepository;
 import uk.gov.defra.trade.imports.plants.audit.Result;
 import uk.gov.defra.trade.imports.plants.configuration.NotificationTtlConfig;
 import uk.gov.defra.trade.imports.plants.exceptions.BadRequestException;
+import uk.gov.defra.trade.imports.plants.exceptions.ForbiddenException;
 import uk.gov.defra.trade.imports.plants.exceptions.NotFoundException;
 
 /**
@@ -88,22 +89,23 @@ public class NotificationService {
     }
 
     /** Creates a notification when the DTO carries no reference number, otherwise updates that one. */
-    public NotificationAggregate saveNotification(NotificationDto notificationDto) {
+    public NotificationAggregate saveNotification(NotificationDto notificationDto, String organisationId) {
         String referenceNumber = notificationDto.getReferenceNumber();
         if (referenceNumber == null || referenceNumber.isBlank()) {
-            return createNotification(notificationDto);
+            return createNotification(notificationDto, organisationId);
         }
-        return replaceContent(referenceNumber, notificationDto);
+        return replaceContent(referenceNumber, notificationDto, organisationId);
     }
 
     /** Replaces the content of a DRAFT or AMEND notification, and refuses any other status. */
     @Transactional
-    public NotificationAggregate replace(String referenceNumber, NotificationDto dto) {
-        return replaceContent(referenceNumber, dto);
+    public NotificationAggregate replace(String referenceNumber, NotificationDto dto, String organisationId) {
+        return replaceContent(referenceNumber, dto, organisationId);
     }
 
-    private NotificationAggregate replaceContent(String referenceNumber, NotificationDto dto) {
-        NotificationAggregate notificationAggregate = requireByReferenceNumber(referenceNumber);
+    private NotificationAggregate replaceContent(
+        String referenceNumber, NotificationDto dto, String organisationId) {
+        NotificationAggregate notificationAggregate = requireTraderNotification(referenceNumber, organisationId);
         if (notificationAggregate.getStatus() != NotificationStatus.DRAFT
             && notificationAggregate.getStatus() != NotificationStatus.AMEND) {
             throw new BadRequestException(
@@ -120,8 +122,9 @@ public class NotificationService {
 
     /** Creates a new DRAFT copied from an existing notification. */
     @Transactional
-    public NotificationAggregate copyNotification(String referenceNumber, Long expectedConcurrencyToken) {
-        NotificationAggregate source = requireByReferenceNumber(referenceNumber);
+    public NotificationAggregate copyNotification(
+        String referenceNumber, Long expectedConcurrencyToken, String organisationId) {
+        NotificationAggregate source = requireTraderNotification(referenceNumber, organisationId);
         if (source.getStatus() != NotificationStatus.DRAFT
             && source.getStatus() != NotificationStatus.SUBMITTED
             && source.getStatus() != NotificationStatus.AMEND) {
@@ -139,16 +142,32 @@ public class NotificationService {
                     + expectedConcurrencyToken + " to " + source.getConcurrencyToken());
         }
         log.info("Copying notification {}", referenceNumber);
-        return createNotification(notificationCopyMapper.toCopyDto(source));
+        return createNotification(notificationCopyMapper.toCopyDto(source), organisationId);
     }
 
-    public NotificationFulfilmentsView findFulfilmentsView(String referenceNumber) {
-        return notificationRepository.findFulfilmentsViewByReferenceNumber(referenceNumber)
-            .orElseThrow(() -> new NotFoundException(
-                CANNOT_FIND_NOTIFICATION_WITH_REFERENCE_NUMBER + referenceNumber));
+    /**
+     * Returns the fulfilment view for a notification owned by the caller's organisation.
+     *
+     * @throws ForbiddenException when the reference exists under another organisation
+     * @throws NotFoundException when no notification exists with the reference
+     */
+    public NotificationFulfilmentsView findFulfilmentsView(String referenceNumber, String organisationId) {
+        Optional<NotificationFulfilmentsView> scoped =
+            notificationRepository.findFulfilmentsViewByReferenceNumberAndOrganisationId(
+                referenceNumber, organisationId);
+        if (scoped.isPresent()) {
+            return scoped.get();
+        }
+        if (notificationRepository.existsByReferenceNumber(referenceNumber)) {
+            throw new ForbiddenException(
+                "Cannot read fulfilments for notification with reference number: "
+                    + referenceNumber + " organisationId: " + organisationId);
+        }
+        throw new NotFoundException(CANNOT_FIND_NOTIFICATION_WITH_REFERENCE_NUMBER + referenceNumber);
     }
 
-    public NotificationPageResponse findDashboardPage(int page, String sort, String referenceNumber) {
+    public NotificationPageResponse findDashboardPage(
+        int page, String sort, String referenceNumber, String organisationId) {
         List<NotificationStatus> dashboardStatuses = List.of(
             NotificationStatus.DRAFT, NotificationStatus.SUBMITTED, NotificationStatus.AMEND);
         var pageable = PageRequest.of(page - 1, listPageSize, NotificationSort.toSort(sort));
@@ -157,7 +176,8 @@ public class NotificationService {
         if (trimmedReferenceNumber != null) {
             log.debug("Fetching notification by reference {} for dashboard", trimmedReferenceNumber);
             Page<NotificationView> matched = notificationRepository
-                .findViewByReferenceNumberAndStatusIn(trimmedReferenceNumber, dashboardStatuses)
+                .findViewByReferenceNumberAndStatusInAndOrganisationId(
+                    trimmedReferenceNumber, dashboardStatuses, organisationId)
                 .<Page<NotificationView>>map(notification ->
                     new PageImpl<>(List.of(notification), pageable, 1))
                 .orElseGet(() -> Page.empty(pageable));
@@ -167,8 +187,8 @@ public class NotificationService {
         }
 
         log.debug("Fetching notifications page {} (size {}) with sort {}", page, listPageSize, sort);
-        Page<NotificationView> result = notificationRepository.findAllViewByStatusIn(
-            dashboardStatuses, pageable);
+        Page<NotificationView> result = notificationRepository.findAllViewByStatusInAndOrganisationId(
+            dashboardStatuses, organisationId, pageable);
         log.debug("Found {} notifications on page {} of {}",
             result.getNumberOfElements(), result.getNumber() + 1, result.getTotalPages());
         return NotificationPageResponse.from(result);
@@ -176,8 +196,9 @@ public class NotificationService {
 
     /** DRAFT or AMEND to SUBMITTED. A re-submission from AMEND clears the amend baselines. */
     @Transactional
-    public NotificationAggregate submitNotification(String referenceNumber) {
-        NotificationAggregate notificationAggregate = requireByReferenceNumber(referenceNumber);
+    public NotificationAggregate submitNotification(String referenceNumber, String organisationId) {
+        NotificationAggregate notificationAggregate =
+            requireTraderNotification(referenceNumber, organisationId);
 
         if (notificationAggregate.getStatus() != NotificationStatus.DRAFT
             && notificationAggregate.getStatus() != NotificationStatus.AMEND) {
@@ -191,8 +212,9 @@ public class NotificationService {
 
     /** SUBMITTED to AMEND, snapshotting the current content and fulfilments as the restore point. */
     @Transactional
-    public NotificationAggregate amendNotification(String referenceNumber) {
-        NotificationAggregate notificationAggregate = requireByReferenceNumber(referenceNumber);
+    public NotificationAggregate amendNotification(String referenceNumber, String organisationId) {
+        NotificationAggregate notificationAggregate =
+            requireTraderNotification(referenceNumber, organisationId);
 
         if (notificationAggregate.getStatus() != NotificationStatus.SUBMITTED) {
             throw new BadRequestException(
@@ -209,8 +231,9 @@ public class NotificationService {
 
     /** AMEND back to SUBMITTED, restoring the snapshot taken when the amendment started. */
     @Transactional
-    public NotificationAggregate cancelAmendNotification(String referenceNumber) {
-        NotificationAggregate notificationAggregate = requireByReferenceNumber(referenceNumber);
+    public NotificationAggregate cancelAmendNotification(String referenceNumber, String organisationId) {
+        NotificationAggregate notificationAggregate =
+            requireTraderNotification(referenceNumber, organisationId);
 
         if (notificationAggregate.getStatus() != NotificationStatus.AMEND) {
             throw new BadRequestException(
@@ -253,8 +276,9 @@ public class NotificationService {
 
     /** Marks a notification DELETED, and returns one already DELETED unchanged. */
     @Transactional
-    public NotificationAggregate softDeleteNotification(String referenceNumber) {
-        NotificationAggregate notificationAggregate = requireByReferenceNumber(referenceNumber);
+    public NotificationAggregate softDeleteNotification(String referenceNumber, String organisationId) {
+        NotificationAggregate notificationAggregate =
+            requireTraderNotification(referenceNumber, organisationId);
         if (notificationAggregate.getStatus() == NotificationStatus.DELETED) {
             log.info("Notification {} is already DELETED, nothing changed", referenceNumber);
             return notificationAggregate;
@@ -313,9 +337,10 @@ public class NotificationService {
             notificationAggregate.setExpireAt(notificationAggregate.getCreated().plus(days, ChronoUnit.DAYS)));
     }
 
-    private NotificationAggregate createNotification(NotificationDto dto) {
+    private NotificationAggregate createNotification(NotificationDto dto, String organisationId) {
         NotificationAggregate notificationAggregate = new NotificationAggregate();
         notificationAggregate.setCreated(clock.instant());
+        notificationAggregate.setOrganisationId(organisationId);
         stampExpiry(notificationAggregate);
         replaceFulfilmentsEnsuringNotification(dto, notificationAggregate);
         int maxAttempts = 3;
@@ -337,10 +362,19 @@ public class NotificationService {
             "Failed to generate a unique reference number after " + maxAttempts + " attempts", lastCollision);
     }
 
-    private NotificationAggregate requireByReferenceNumber(String referenceNumber) {
-        return notificationRepository.findByReferenceNumber(referenceNumber)
-            .orElseThrow(() -> new NotFoundException(
-                CANNOT_FIND_NOTIFICATION_WITH_REFERENCE_NUMBER + referenceNumber));
+    private NotificationAggregate requireTraderNotification(String referenceNumber, String organisationId) {
+        Optional<NotificationAggregate> scoped =
+            notificationRepository.findByReferenceNumberAndOrganisationId(referenceNumber, organisationId);
+        if (scoped.isPresent()) {
+            return scoped.get();
+        }
+        if (notificationRepository.existsByReferenceNumber(referenceNumber)) {
+            log.warn(
+                "Trader notification access denied for referenceNumber={} organisationId={}",
+                referenceNumber,
+                organisationId);
+        }
+        throw new NotFoundException(CANNOT_FIND_NOTIFICATION_WITH_REFERENCE_NUMBER + referenceNumber);
     }
 
     private void replaceFulfilmentsEnsuringNotification(NotificationDto dto, NotificationAggregate notificationAggregate) {

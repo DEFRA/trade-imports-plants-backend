@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import uk.gov.defra.trade.imports.plants.filter.TraderOrganisationHeaderFilter;
 
 /**
  * Notification endpoints for the plants journey.
@@ -45,12 +46,15 @@ public class NotificationController {
 
     @PostMapping
     @Operation(summary = "Save notification", description = "Creates or updates a notification")
+    @ApiResponse(responseCode = "400", description = "Missing or blank Trade-Imports-Organisation-Id header",
+        content = @Content)
     @Timed("controller.postNotification.time")
     public ResponseEntity<NotificationAggregate> post(
-        @Valid @RequestBody SaveNotificationDto saveNotificationDto) {
+        @Valid @RequestBody SaveNotificationDto saveNotificationDto,
+        @RequestHeader(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER) String organisationId) {
         NotificationDto notificationDto = saveNotificationDto.getNotification();
         log.info("POST /notifications - referenceNumber={}", notificationDto.getReferenceNumber());
-        return ResponseEntity.ok(notificationService.saveNotification(notificationDto));
+        return ResponseEntity.ok(notificationService.saveNotification(notificationDto, organisationId));
     }
 
     @PutMapping("/{referenceNumber}")
@@ -58,22 +62,27 @@ public class NotificationController {
         description = "Replaces the notification content (notification-shape fields + opaque fulfilments payload) at the given reference. Requires DRAFT or AMEND status.")
     @ApiResponse(responseCode = "200", description = "Notification content replaced",
         content = @Content(schema = @Schema(implementation = NotificationAggregate.class)))
+    @ApiResponse(responseCode = "400", description = "Missing or blank Trade-Imports-Organisation-Id header",
+        content = @Content)
     @ApiResponse(responseCode = "400", description = "Notification not in a replaceable state", content = @Content)
     @ApiResponse(responseCode = "404", description = "Notification not found", content = @Content)
     @ApiResponse(responseCode = "409", description = "concurrencyToken does not match the stored notification", content = @Content)
     @Timed("controller.replaceNotification.time")
     public ResponseEntity<NotificationAggregate> replace(
         @Pattern(regexp = ReferenceNumberGenerator.REFERENCE_NUMBER_PATTERN) @PathVariable String referenceNumber,
-        @Valid @RequestBody SaveNotificationDto saveNotificationDto) {
+        @Valid @RequestBody SaveNotificationDto saveNotificationDto,
+        @RequestHeader(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER) String organisationId) {
         log.info("PUT /notifications/{} - Replacing notification content", referenceNumber);
         return ResponseEntity.ok(
-            notificationService.replace(referenceNumber, saveNotificationDto.getNotification()));
+            notificationService.replace(referenceNumber, saveNotificationDto.getNotification(), organisationId));
     }
 
     @PostMapping("/{referenceNumber}/copy")
     @Operation(summary = "Copy notification", description = "Creates a new DRAFT notification copied from an existing one")
     @ApiResponse(responseCode = "200", description = "New DRAFT notification created",
         content = @Content(schema = @Schema(implementation = NotificationAggregate.class)))
+    @ApiResponse(responseCode = "400", description = "Missing or blank Trade-Imports-Organisation-Id header",
+        content = @Content)
     @ApiResponse(responseCode = "400", description = "Source notification is not in a copyable status", content = @Content)
     @ApiResponse(responseCode = "404", description = "Source notification not found", content = @Content)
     @ApiResponse(responseCode = "409", description = "concurrencyToken does not match the current source notification", content = @Content)
@@ -81,11 +90,12 @@ public class NotificationController {
     public ResponseEntity<NotificationAggregate> copy(
         @Pattern(regexp = ReferenceNumberGenerator.REFERENCE_NUMBER_PATTERN) @PathVariable String referenceNumber,
         @RequestParam Long concurrencyToken,
-        @RequestBody(required = false) ActorRequest actorRequest) {
+        @RequestBody(required = false) ActorRequest actorRequest,
+        @RequestHeader(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER) String organisationId) {
         log.info("POST /notifications/{}/copy - Copying notification at expectedConcurrencyToken={}",
             referenceNumber, concurrencyToken);
         return ResponseEntity.ok(
-            notificationService.copyNotification(referenceNumber, concurrencyToken));
+            notificationService.copyNotification(referenceNumber, concurrencyToken, organisationId));
     }
 
     @PostMapping("/{referenceNumber}/submit")
@@ -93,14 +103,17 @@ public class NotificationController {
         description = "Transitions notification status to SUBMITTED. Accepts DRAFT or AMEND as the source state.")
     @ApiResponse(responseCode = "200", description = "Notification submitted",
         content = @Content(schema = @Schema(implementation = NotificationAggregate.class)))
+    @ApiResponse(responseCode = "400", description = "Missing or blank Trade-Imports-Organisation-Id header",
+        content = @Content)
     @ApiResponse(responseCode = "400", description = "Notification not in a submittable state", content = @Content)
     @ApiResponse(responseCode = "404", description = "Notification not found", content = @Content)
     @Timed("controller.submitNotification.time")
     public ResponseEntity<NotificationAggregate> submit(
         @Pattern(regexp = ReferenceNumberGenerator.REFERENCE_NUMBER_PATTERN) @PathVariable String referenceNumber,
-        @RequestBody(required = false) ActorRequest actorRequest) {
+        @RequestBody(required = false) ActorRequest actorRequest,
+        @RequestHeader(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER) String organisationId) {
         log.info("POST /notifications/{}/submit - Submitting notification", referenceNumber);
-        return ResponseEntity.ok(notificationService.submitNotification(referenceNumber));
+        return ResponseEntity.ok(notificationService.submitNotification(referenceNumber, organisationId));
     }
 
     @PostMapping("/{referenceNumber}/amend")
@@ -108,14 +121,17 @@ public class NotificationController {
         description = "Transitions notification status from SUBMITTED to AMEND, snapshotting the submitted content so the amendment can be cancelled.")
     @ApiResponse(responseCode = "200", description = "Notification moved to AMEND",
         content = @Content(schema = @Schema(implementation = NotificationAggregate.class)))
+    @ApiResponse(responseCode = "400", description = "Missing or blank Trade-Imports-Organisation-Id header",
+        content = @Content)
     @ApiResponse(responseCode = "400", description = "Notification not in an amendable state", content = @Content)
     @ApiResponse(responseCode = "404", description = "Notification not found", content = @Content)
     @Timed("controller.amendNotification.time")
     public ResponseEntity<NotificationAggregate> amend(
         @Pattern(regexp = ReferenceNumberGenerator.REFERENCE_NUMBER_PATTERN) @PathVariable String referenceNumber,
-        @RequestBody(required = false) ActorRequest actorRequest) {
+        @RequestBody(required = false) ActorRequest actorRequest,
+        @RequestHeader(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER) String organisationId) {
         log.info("POST /notifications/{}/amend - Amending notification", referenceNumber);
-        return ResponseEntity.ok(notificationService.amendNotification(referenceNumber));
+        return ResponseEntity.ok(notificationService.amendNotification(referenceNumber, organisationId));
     }
 
     @PostMapping("/{referenceNumber}/cancel-amend")
@@ -123,14 +139,17 @@ public class NotificationController {
         description = "Restores the submitted notification content and transitions status from AMEND to SUBMITTED.")
     @ApiResponse(responseCode = "200", description = "Amendment cancelled",
         content = @Content(schema = @Schema(implementation = NotificationAggregate.class)))
+    @ApiResponse(responseCode = "400", description = "Missing or blank Trade-Imports-Organisation-Id header",
+        content = @Content)
     @ApiResponse(responseCode = "400", description = "Notification not in AMEND status or baseline missing", content = @Content)
     @ApiResponse(responseCode = "404", description = "Notification not found", content = @Content)
     @Timed("controller.cancelAmendNotification.time")
     public ResponseEntity<NotificationAggregate> cancelAmend(
         @Pattern(regexp = ReferenceNumberGenerator.REFERENCE_NUMBER_PATTERN) @PathVariable String referenceNumber,
-        @RequestBody(required = false) ActorRequest actorRequest) {
+        @RequestBody(required = false) ActorRequest actorRequest,
+        @RequestHeader(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER) String organisationId) {
         log.info("POST /notifications/{}/cancel-amend - Cancelling amendment", referenceNumber);
-        return ResponseEntity.ok(notificationService.cancelAmendNotification(referenceNumber));
+        return ResponseEntity.ok(notificationService.cancelAmendNotification(referenceNumber, organisationId));
     }
 
     @GetMapping
@@ -140,13 +159,16 @@ public class NotificationController {
             + "Optional referenceNumber: exact match against a complete notification reference number.")
     @ApiResponse(responseCode = "200", description = "Paginated notifications returned",
         content = @Content(schema = @Schema(implementation = NotificationPageResponse.class)))
+    @ApiResponse(responseCode = "400", description = "Missing or blank Trade-Imports-Organisation-Id header",
+        content = @Content)
     @Timed("controller.findDashboardPage.time")
     public NotificationPageResponse findDashboardPage(
         @RequestParam(defaultValue = "1") @Min(1) int page,
         @RequestParam(required = false) String sort,
-        @RequestParam(required = false) String referenceNumber) {
+        @RequestParam(required = false) String referenceNumber,
+        @RequestHeader(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER) String organisationId) {
         log.debug("GET /notifications?page={}&sort={}&referenceNumber={}", page, sort, referenceNumber);
-        return notificationService.findDashboardPage(page, sort, referenceNumber);
+        return notificationService.findDashboardPage(page, sort, referenceNumber, organisationId);
     }
 
     @GetMapping("/{referenceNumber}/fulfilments")
@@ -154,12 +176,16 @@ public class NotificationController {
         description = "Returns the fulfilment-view projection (referenceNumber, status, dates, opaque fulfilments payload) of the notification at the given reference. Backs the frontend engine's rehydrate path.")
     @ApiResponse(responseCode = "200", description = "Fulfilment view returned",
         content = @Content(schema = @Schema(implementation = NotificationFulfilmentsView.class)))
+    @ApiResponse(responseCode = "400", description = "Missing or blank Trade-Imports-Organisation-Id header",
+        content = @Content)
     @ApiResponse(responseCode = "404", description = "Notification not found", content = @Content)
+    @ApiResponse(responseCode = "403", description = "Notification belongs to another organisation", content = @Content)
     @Timed("controller.getFulfilments.time")
     public ResponseEntity<NotificationFulfilmentsView> findFulfilments(
-        @Pattern(regexp = ReferenceNumberGenerator.REFERENCE_NUMBER_PATTERN) @PathVariable String referenceNumber) {
+        @Pattern(regexp = ReferenceNumberGenerator.REFERENCE_NUMBER_PATTERN) @PathVariable String referenceNumber,
+        @RequestHeader(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER) String organisationId) {
         log.debug("GET /notifications/{}/fulfilments - Fetching fulfilment view", referenceNumber);
-        return ResponseEntity.ok(notificationService.findFulfilmentsView(referenceNumber));
+        return ResponseEntity.ok(notificationService.findFulfilmentsView(referenceNumber, organisationId));
     }
 
     @GetMapping("/reference-numbers")
@@ -179,14 +205,17 @@ public class NotificationController {
         description = "Transitions notification status to DELETED (soft delete). Only DRAFT, SUBMITTED and AMEND notifications can be deleted.")
     @ApiResponse(responseCode = "200", description = "Notification soft-deleted",
         content = @Content(schema = @Schema(implementation = NotificationAggregate.class)))
+    @ApiResponse(responseCode = "400", description = "Missing or blank Trade-Imports-Organisation-Id header",
+        content = @Content)
     @ApiResponse(responseCode = "400", description = "Notification not in a deletable state", content = @Content)
     @ApiResponse(responseCode = "404", description = "Notification not found", content = @Content)
     @Timed("controller.softDeleteNotification.time")
     public ResponseEntity<NotificationAggregate> softDelete(
         @Pattern(regexp = ReferenceNumberGenerator.REFERENCE_NUMBER_PATTERN) @PathVariable String referenceNumber,
-        @RequestBody(required = false) ActorRequest actorRequest) {
+        @RequestBody(required = false) ActorRequest actorRequest,
+        @RequestHeader(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER) String organisationId) {
         log.info("POST /notifications/{}/soft-delete - Soft deleting notification", referenceNumber);
-        return ResponseEntity.ok(notificationService.softDeleteNotification(referenceNumber));
+        return ResponseEntity.ok(notificationService.softDeleteNotification(referenceNumber, organisationId));
     }
 
     @DeleteMapping

@@ -26,6 +26,7 @@ import uk.gov.defra.trade.imports.plants.audit.AuditRepository;
 import uk.gov.defra.trade.imports.plants.audit.Result;
 import uk.gov.defra.trade.imports.plants.notification.NotificationAggregate;
 import uk.gov.defra.trade.imports.plants.notification.NotificationRepository;
+import uk.gov.defra.trade.imports.plants.testsupport.TraderOrganisationTestSupport;
 import uk.gov.defra.trade.imports.plants.notification.NotificationSort;
 import uk.gov.defra.trade.imports.plants.notification.NotificationStatus;
 
@@ -115,13 +116,16 @@ class PersistedTimestampZoneIT extends IntegrationBase {
     void findByReferenceNumber_shouldReadBackEveryTimestamp_whenTheDocumentHoldsRawBsonDates() {
         mongoTemplate.getCollection(NOTIFICATION_COLLECTION).insertOne(new Document()
             .append("referenceNumber", REF)
+            .append("organisationId", TraderOrganisationTestSupport.ORGANISATION_ID)
             .append("status", NotificationStatus.SUBMITTED.name())
             .append("created", Date.from(CREATED))
             .append("updated", Date.from(UPDATED_AT_BSON_MILLISECOND_PRECISION))
             .append("submittedAt", Date.from(SUBMITTED_AT))
             .append("expireAt", Date.from(EXPIRE_AT)));
 
-        NotificationAggregate read = notificationRepository.findByReferenceNumber(REF).orElseThrow();
+        NotificationAggregate read = notificationRepository
+            .findByReferenceNumberAndOrganisationId(REF, TraderOrganisationTestSupport.ORGANISATION_ID)
+            .orElseThrow();
 
         assertThat(read.getCreated()).isEqualTo(CREATED);
         assertThat(read.getUpdated()).isEqualTo(UPDATED_AT_BSON_MILLISECOND_PRECISION);
@@ -182,12 +186,15 @@ class PersistedTimestampZoneIT extends IntegrationBase {
         String dateShaped = "2026-07-21";
         notificationRepository.save(NotificationAggregate.builder()
             .referenceNumber(REF)
+            .organisationId(TraderOrganisationTestSupport.ORGANISATION_ID)
             .status(NotificationStatus.DRAFT)
             .created(CREATED)
             .fulfilments(List.of(new Document("arrivalDate", dateShaped)))
             .build());
 
-        NotificationAggregate read = notificationRepository.findByReferenceNumber(REF).orElseThrow();
+        NotificationAggregate read = notificationRepository
+            .findByReferenceNumberAndOrganisationId(REF, TraderOrganisationTestSupport.ORGANISATION_ID)
+            .orElseThrow();
 
         assertThat(read.getFulfilments().getFirst()).containsEntry("arrivalDate", dateShaped);
         assertThat(storedNotification().getList("fulfilments", Document.class).getFirst()

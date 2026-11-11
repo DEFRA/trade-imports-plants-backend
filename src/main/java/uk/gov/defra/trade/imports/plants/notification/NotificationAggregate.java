@@ -10,9 +10,13 @@ import lombok.NoArgsConstructor;
 import org.bson.Document;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.Version;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.Indexed;
 
 @org.springframework.data.mongodb.core.mapping.Document(collection = "notification")
+@CompoundIndex(
+    name = "organisationId_status_created",
+    def = "{'organisationId': 1, 'status': 1, 'created': -1}")
 @Data
 @Builder(toBuilder = true)
 @NoArgsConstructor
@@ -24,6 +28,8 @@ public class NotificationAggregate {
 
     @Indexed(unique = true, sparse = true)
     private String referenceNumber;
+
+    private String organisationId;
 
     @Version
     private Long concurrencyToken;

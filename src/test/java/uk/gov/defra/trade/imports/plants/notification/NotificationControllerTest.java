@@ -3,6 +3,8 @@ package uk.gov.defra.trade.imports.plants.notification;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -27,13 +29,25 @@ import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import java.util.stream.Stream;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import uk.gov.defra.trade.imports.plants.exceptions.BadRequestException;
 import uk.gov.defra.trade.imports.plants.exceptions.GlobalExceptionHandler;
 import uk.gov.defra.trade.imports.plants.exceptions.NotFoundException;
+import uk.gov.defra.trade.imports.plants.filter.TraderOrganisationHeaderFilter;
+import uk.gov.defra.trade.imports.plants.testsupport.TraderOrganisationTestSupport;
+
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @WebMvcTest(controllers = NotificationController.class)
-@org.springframework.context.annotation.Import(GlobalExceptionHandler.class)
+@Import({GlobalExceptionHandler.class, TraderOrganisationHeaderFilter.class})
 class NotificationControllerTest {
+
+    private static final String ORGANISATION_ID = TraderOrganisationTestSupport.ORGANISATION_ID;
 
     private static final String REFERENCE = "GBN-HRP-26-ABC123";
     private static final Instant SUBMITTED_AT = Instant.parse("2026-07-14T10:30:15Z");
@@ -67,10 +81,11 @@ class NotificationControllerTest {
 
     @Test
     void post_shouldPassTheSentNotificationToTheServiceAndReturnTheAggregate() throws Exception {
-        when(notificationService.saveNotification(sentNotification()))
+        when(notificationService.saveNotification(sentNotification(), ORGANISATION_ID))
             .thenReturn(aggregate(NotificationStatus.DRAFT));
 
         mockMvc.perform(post("/notifications")
+                .header(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER, ORGANISATION_ID)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(SaveNotificationDto.of(sentNotification()))))
             .andExpect(status().isOk())
@@ -81,11 +96,12 @@ class NotificationControllerTest {
     @Test
     void post_shouldReturn400_whenNotificationIsMissingFromTheBody() throws Exception {
         mockMvc.perform(post("/notifications")
+                .header(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER, ORGANISATION_ID)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
             .andExpect(status().isBadRequest());
 
-        verify(notificationService, never()).saveNotification(any());
+        verify(notificationService, never()).saveNotification(any(), anyString());
     }
 
     @ParameterizedTest
@@ -95,21 +111,23 @@ class NotificationControllerTest {
     })
     void post_shouldReturn400_whenTheBodyCannotBeRead(String body) throws Exception {
         mockMvc.perform(post("/notifications")
+                .header(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER, ORGANISATION_ID)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.type")
                 .value("https://api.cdp.defra.cloud/problems/malformed-request"));
 
-        verify(notificationService, never()).saveNotification(any());
+        verify(notificationService, never()).saveNotification(any(), anyString());
     }
 
     @Test
     void put_shouldPassTheReferenceAndSentNotificationToTheServiceAndReturnTheAggregate() throws Exception {
-        when(notificationService.replace(REFERENCE, sentNotification()))
+        when(notificationService.replace(REFERENCE, sentNotification(), ORGANISATION_ID))
             .thenReturn(aggregate(NotificationStatus.DRAFT));
 
         mockMvc.perform(put("/notifications/{referenceNumber}", REFERENCE)
+                .header(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER, ORGANISATION_ID)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(SaveNotificationDto.of(sentNotification()))))
             .andExpect(status().isOk())
@@ -120,60 +138,66 @@ class NotificationControllerTest {
     @ValueSource(strings = {"26-ABC123", "GBN-AG-26-ABC123", "GBN-HRP-26-ABC12I"})
     void put_shouldReturn400_whenReferenceNumberDoesNotMatchThePlantsPattern(String reference) throws Exception {
         mockMvc.perform(put("/notifications/{referenceNumber}", reference)
+                .header(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER, ORGANISATION_ID)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(SaveNotificationDto.of(
                     NotificationDto.builder().concurrencyToken(1L).build()))))
             .andExpect(status().isBadRequest());
 
-        verify(notificationService, never()).replace(any(), any());
+        verify(notificationService, never()).replace(any(), any(), anyString());
     }
 
     @Test
     void submit_shouldReturnTheSubmittedAggregate() throws Exception {
-        when(notificationService.submitNotification(REFERENCE))
+        when(notificationService.submitNotification(eq(REFERENCE), eq(ORGANISATION_ID)))
             .thenReturn(aggregate(NotificationStatus.SUBMITTED));
 
-        mockMvc.perform(post("/notifications/{referenceNumber}/submit", REFERENCE))
+        mockMvc.perform(post("/notifications/{referenceNumber}/submit", REFERENCE)
+                .header(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER, ORGANISATION_ID))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("SUBMITTED"));
     }
 
     @Test
     void submit_shouldReturn400_whenTheStatusTransitionIsIllegal() throws Exception {
-        when(notificationService.submitNotification(REFERENCE))
+        when(notificationService.submitNotification(eq(REFERENCE), eq(ORGANISATION_ID)))
             .thenThrow(new BadRequestException("Cannot submit notification with status: DELETED"));
 
-        mockMvc.perform(post("/notifications/{referenceNumber}/submit", REFERENCE))
+        mockMvc.perform(post("/notifications/{referenceNumber}/submit", REFERENCE)
+                .header(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER, ORGANISATION_ID))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.detail").value("Cannot submit notification with status: DELETED"));
     }
 
     @Test
     void amend_shouldReturnTheAmendingAggregate() throws Exception {
-        when(notificationService.amendNotification(REFERENCE))
+        when(notificationService.amendNotification(eq(REFERENCE), eq(ORGANISATION_ID)))
             .thenReturn(aggregate(NotificationStatus.AMEND));
 
-        mockMvc.perform(post("/notifications/{referenceNumber}/amend", REFERENCE))
+        mockMvc.perform(post("/notifications/{referenceNumber}/amend", REFERENCE)
+                .header(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER, ORGANISATION_ID))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("AMEND"));
     }
 
     @Test
     void cancelAmend_shouldReturnTheRestoredAggregate() throws Exception {
-        when(notificationService.cancelAmendNotification(REFERENCE))
+        when(notificationService.cancelAmendNotification(eq(REFERENCE), eq(ORGANISATION_ID)))
             .thenReturn(aggregate(NotificationStatus.SUBMITTED));
 
-        mockMvc.perform(post("/notifications/{referenceNumber}/cancel-amend", REFERENCE))
+        mockMvc.perform(post("/notifications/{referenceNumber}/cancel-amend", REFERENCE)
+                .header(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER, ORGANISATION_ID))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("SUBMITTED"));
     }
 
     @Test
     void copy_shouldReturn409_whenTheSourceHasAdvanced() throws Exception {
-        when(notificationService.copyNotification(REFERENCE, 1L))
+        when(notificationService.copyNotification(eq(REFERENCE), eq(1L), eq(ORGANISATION_ID)))
             .thenThrow(new OptimisticLockingFailureException("source has advanced"));
 
         mockMvc.perform(post("/notifications/{referenceNumber}/copy", REFERENCE)
+                .header(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER, ORGANISATION_ID)
                 .param("concurrencyToken", "1"))
             .andExpect(status().isConflict())
             .andExpect(jsonPath("$.code").value("STALE_CONCURRENCY_TOKEN"));
@@ -181,22 +205,24 @@ class NotificationControllerTest {
 
     @Test
     void softDelete_shouldReturnTheDeletedAggregate() throws Exception {
-        when(notificationService.softDeleteNotification(REFERENCE))
+        when(notificationService.softDeleteNotification(eq(REFERENCE), eq(ORGANISATION_ID)))
             .thenReturn(aggregate(NotificationStatus.DELETED));
 
-        mockMvc.perform(post("/notifications/{referenceNumber}/soft-delete", REFERENCE))
+        mockMvc.perform(post("/notifications/{referenceNumber}/soft-delete", REFERENCE)
+                .header(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER, ORGANISATION_ID))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("DELETED"));
     }
 
     @Test
     void findDashboardPage_shouldReturnThePaginationEnvelope() throws Exception {
-        when(notificationService.findDashboardPage(1, null, null)).thenReturn(new NotificationPageResponse(
+        when(notificationService.findDashboardPage(1, null, null, ORGANISATION_ID)).thenReturn(new NotificationPageResponse(
             List.of(new NotificationView.Data(
                 REFERENCE, 1L, NotificationStatus.SUBMITTED, Instant.now(), SUBMITTED_AT)),
             1, 25, 1, 26L, 2));
 
-        mockMvc.perform(get("/notifications"))
+        mockMvc.perform(get("/notifications")
+                .header(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER, ORGANISATION_ID))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.content.length()").value(1))
             .andExpect(jsonPath("$.content[0].referenceNumber").value(REFERENCE))
@@ -211,18 +237,20 @@ class NotificationControllerTest {
 
     @Test
     void findDashboardPage_shouldReturn400_whenPageIsBelowOne() throws Exception {
-        mockMvc.perform(get("/notifications").param("page", "0"))
+        mockMvc.perform(get("/notifications").param("page", "0")
+                .header(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER, ORGANISATION_ID))
             .andExpect(status().isBadRequest());
 
-        verify(notificationService, never()).findDashboardPage(anyInt(), any(), any());
+        verify(notificationService, never()).findDashboardPage(anyInt(), any(), any(), anyString());
     }
 
     @Test
     void findFulfilments_shouldReturn404_whenTheNotificationDoesNotExist() throws Exception {
-        when(notificationService.findFulfilmentsView(REFERENCE))
+        when(notificationService.findFulfilmentsView(eq(REFERENCE), eq(ORGANISATION_ID)))
             .thenThrow(new NotFoundException("Cannot find notification with reference number: " + REFERENCE));
 
-        mockMvc.perform(get("/notifications/{referenceNumber}/fulfilments", REFERENCE))
+        mockMvc.perform(get("/notifications/{referenceNumber}/fulfilments", REFERENCE)
+                .header(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER, ORGANISATION_ID))
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.detail").value(
                 "Cannot find notification with reference number: " + REFERENCE));
@@ -290,5 +318,42 @@ class NotificationControllerTest {
             .andExpect(status().isBadRequest());
 
         verify(notificationService, never()).deleteByReferenceNumbers(anyList(), any());
+    }
+
+    @ParameterizedTest
+    @MethodSource("traderRoutesRequiringOrganisationHeader")
+    void traderRoutes_shouldRejectMissingOrBlankOrganisationHeader(MockHttpServletRequestBuilder request)
+        throws Exception {
+        mockMvc.perform(request)
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.detail")
+                .value("Missing required header Trade-Imports-Organisation-Id"));
+        verifyNoInteractions(notificationService);
+    }
+
+    static Stream<Arguments> traderRoutesRequiringOrganisationHeader() {
+        String createBody = "{\"notification\":{}}";
+        String replaceBody = "{\"notification\":{\"concurrencyToken\":1}}";
+        return Stream.of(
+            Arguments.of(get("/notifications")),
+            Arguments.of(get("/notifications").header(
+                TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER, "   ")),
+            Arguments.of(post("/notifications")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(createBody)),
+            Arguments.of(post("/notifications")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(createBody)
+                .header(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER, "   ")),
+            Arguments.of(get("/notifications/{referenceNumber}/fulfilments", REFERENCE)),
+            Arguments.of(put("/notifications/{referenceNumber}", REFERENCE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(replaceBody)),
+            Arguments.of(post("/notifications/{referenceNumber}/copy", REFERENCE).param("concurrencyToken", "1")),
+            Arguments.of(post("/notifications/{referenceNumber}/submit", REFERENCE)),
+            Arguments.of(post("/notifications/{referenceNumber}/amend", REFERENCE)),
+            Arguments.of(post("/notifications/{referenceNumber}/cancel-amend", REFERENCE)),
+            Arguments.of(post("/notifications/{referenceNumber}/soft-delete", REFERENCE))
+        );
     }
 }

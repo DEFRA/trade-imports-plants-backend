@@ -15,6 +15,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Optional;
 import org.bson.Document;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,6 +32,7 @@ import uk.gov.defra.trade.imports.plants.notification.NotificationAggregate;
 import uk.gov.defra.trade.imports.plants.notification.NotificationExpiryIndex;
 import uk.gov.defra.trade.imports.plants.notification.NotificationRepository;
 import uk.gov.defra.trade.imports.plants.notification.NotificationStatus;
+import uk.gov.defra.trade.imports.plants.testsupport.TraderOrganisationTestSupport;
 
 @TestPropertySource(
     properties = {
@@ -90,9 +92,9 @@ class NotificationExpiryIT extends IntegrationBase {
     await()
         .atMost(Duration.ofSeconds(30))
         .untilAsserted(() ->
-            assertThat(notificationRepository.findByReferenceNumber(expiredReference)).isEmpty());
-    assertThat(notificationRepository.findByReferenceNumber(undatedReference)).isPresent();
-    assertThat(notificationRepository.findByReferenceNumber(unexpiredReference)).isPresent();
+            assertThat(storedNotification(expiredReference)).isEmpty());
+    assertThat(storedNotification(undatedReference)).isPresent();
+    assertThat(storedNotification(unexpiredReference)).isPresent();
   }
 
   private void replaceExpireAtIndexesWithAPlainIndex() {
@@ -120,9 +122,15 @@ class NotificationExpiryIT extends IntegrationBase {
   private void saveNotification(String referenceNumber, Instant expireAt) {
     notificationRepository.save(NotificationAggregate.builder()
         .referenceNumber(referenceNumber)
+        .organisationId(TraderOrganisationTestSupport.ORGANISATION_ID)
         .status(NotificationStatus.DRAFT)
         .expireAt(expireAt)
         .build());
+  }
+
+  private Optional<NotificationAggregate> storedNotification(String referenceNumber) {
+    return notificationRepository.findByReferenceNumberAndOrganisationId(
+        referenceNumber, TraderOrganisationTestSupport.ORGANISATION_ID);
   }
 
   private void setTtlMonitorSleepSecs(int seconds) {
