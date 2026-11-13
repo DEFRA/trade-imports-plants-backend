@@ -8,35 +8,18 @@ import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import com.mongodb.connection.ConnectionPoolSettings;
 import lombok.extern.slf4j.Slf4j;
-import net.javacrumbs.shedlock.core.DefaultLockingTaskExecutor;
-import net.javacrumbs.shedlock.core.LockProvider;
-import net.javacrumbs.shedlock.core.LockingTaskExecutor;
-import net.javacrumbs.shedlock.provider.mongo.MongoLockProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.mongodb.MongoDatabaseFactory;
 import org.springframework.data.mongodb.MongoTransactionManager;
 import org.springframework.data.mongodb.core.convert.MongoCustomConversions;
-import org.springframework.scheduling.annotation.EnableScheduling;
 import javax.net.ssl.SSLContext;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import uk.gov.defra.trade.imports.plants.configuration.tls.TrustStoreConfiguration;
 
-/**
- * MongoDB configuration for Trade Imports Plants Backend.
- *
- * <p>Configures MongoDB connection with: - AWS IAM authentication (via connection string
- * authMechanism=MONGODB-AWS) - Custom SSL/TLS certificates from TRUSTSTORE_* environment variables
- * - Read preference: secondary (configurable) - Write concern: majority (configurable) - Connection
- * pooling - Graceful shutdown
- *
- * <p>Connection string format for AWS IAM auth:
- * mongodb://host:port/database?authMechanism=MONGODB-AWS&authSource=$external
- */
 @Configuration
-@EnableScheduling
 @Slf4j
 public class MongoConfig {
 
@@ -74,19 +57,13 @@ public class MongoConfig {
       if (sslEnabled) {
           SSLContext sslContext = trustStoreConfiguration.customSslContext();
           builder.applyToSslSettings(bdr -> bdr.context(sslContext));
-          log.info("MongoDB SSL configured with SSL Bundle");
+          log.info("MongoDB SSL configured with the trust store SSL context");
       }
       log.info("MongoDB client configuration complete");
       
     return builder.build();
   }
 
-  /**
-   * Registers the {@code LocalDate} string converters ahead of Spring Data's built-in JSR-310
-   * pair, so date-only fields persist as a {@code YYYY-MM-DD} string rather than a BSON date at
-   * start-of-day in the JVM's default timezone. See {@link LocalDateStringConverters} for the
-   * rationale.
-   */
   @Bean
   MongoCustomConversions mongoCustomConversions() {
     return new MongoCustomConversions(List.of(
@@ -108,16 +85,5 @@ public class MongoConfig {
 
     return new CommitRetryingMongoTransactionManager(
         dbFactory, commitRetryTimeoutMs, commitRetryBackoffMs);
-  }
-
-  @Bean
-  LockProvider lockProvider(MongoClient mongoClient,
-      @Value("${spring.data.mongodb.database}") String dbName) {
-    return new MongoLockProvider(mongoClient.getDatabase(dbName));
-  }
-
-  @Bean
-  LockingTaskExecutor lockingTaskExecutor(LockProvider lockProvider) {
-    return new DefaultLockingTaskExecutor(lockProvider);
   }
 }

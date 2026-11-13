@@ -13,9 +13,6 @@ import org.springframework.data.annotation.Version;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.Indexed;
 
-import static java.util.Objects.requireNonNull;
-
-/** Notification aggregate stored in MongoDB. */
 @org.springframework.data.mongodb.core.mapping.Document(collection = "notification")
 @CompoundIndex(
     name = "organisationId_status_created",
@@ -46,7 +43,6 @@ public class NotificationAggregate {
     private Instant submittedAt;
 
     @JsonIgnore
-    @Indexed
     private Instant expireAt;
 
     private Notification notification;
@@ -58,10 +54,4 @@ public class NotificationAggregate {
 
     @JsonIgnore
     private List<Document> submittedFulfilmentsBaseline;
-
-    /** Returns the notification sub-object, failing fast if absent. */
-    public Notification requireNotification() {
-        return requireNonNull(notification,
-            "NotificationAggregate requires a notification sub-object at this seam");
-    }
 }

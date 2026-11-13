@@ -26,7 +26,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import uk.gov.defra.trade.imports.plants.filter.TraderOrganisationHeaderFilter;
 
-/** Notification endpoints for the plants journey. */
+/**
+ * Notification endpoints for the plants journey.
+ *
+ * <p>Write requests may carry an {@link ActorRequest}, which is ignored.
+ */
 @RestController
 @RequestMapping("/notifications")
 @Tag(name = "Notification API", description = "CRUD operations for the notification in the plants journey")
@@ -152,19 +156,19 @@ public class NotificationController {
     @Operation(summary = "List notifications",
         description = "Returns a paginated list of import notifications. "
             + "Optional sort: createdAt,desc (default) or createdAt,asc. "
-            + "Optional referenceNumber: exact match against a complete notification reference.")
+            + "Optional referenceNumber: exact match against a complete notification reference number.")
     @ApiResponse(responseCode = "200", description = "Paginated notifications returned",
         content = @Content(schema = @Schema(implementation = NotificationPageResponse.class)))
     @ApiResponse(responseCode = "400", description = "Missing or blank Trade-Imports-Organisation-Id header",
         content = @Content)
-    @Timed("controller.getAllNotifications.time")
-    public NotificationPageResponse findAll(
+    @Timed("controller.findDashboardPage.time")
+    public NotificationPageResponse findDashboardPage(
         @RequestParam(defaultValue = "1") @Min(1) int page,
         @RequestParam(required = false) String sort,
         @RequestParam(required = false) String referenceNumber,
         @RequestHeader(TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER) String organisationId) {
         log.debug("GET /notifications?page={}&sort={}&referenceNumber={}", page, sort, referenceNumber);
-        return notificationService.findAll(page, sort, referenceNumber, organisationId);
+        return notificationService.findDashboardPage(page, sort, referenceNumber, organisationId);
     }
 
     @GetMapping("/{referenceNumber}/fulfilments")
