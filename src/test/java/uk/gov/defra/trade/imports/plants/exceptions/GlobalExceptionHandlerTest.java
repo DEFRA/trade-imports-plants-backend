@@ -5,6 +5,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import java.lang.reflect.Method;
 import java.net.URI;
 import java.util.List;
@@ -12,6 +16,7 @@ import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpStatus;
@@ -23,6 +28,9 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 
 class GlobalExceptionHandlerTest {
+
+    private static final Logger HANDLER_LOGGER =
+        (Logger) LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     private GlobalExceptionHandler exceptionHandler;
 
@@ -324,6 +332,32 @@ class GlobalExceptionHandlerTest {
         assertThat(problemDetail.getType())
             .isEqualTo(URI.create("https://api.cdp.defra.cloud/problems/forbidden"));
         assertThat(problemDetail.getProperties()).containsEntry("traceId", traceId);
+    }
+
+    @Test
+    void handleForbiddenException_shouldLogTheReferenceAndOrganisationOnceWithoutAStackTrace() {
+        String traceId = "test-trace-forbidden-1";
+        MDC.put("trace.id", traceId);
+        String detail =
+            "Cannot read fulfilments for notification with reference number: "
+                + "GBN-DP-26-ABC001 organisationId: 5900002";
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        HANDLER_LOGGER.addAppender(appender);
+        HANDLER_LOGGER.setLevel(Level.WARN);
+        try {
+            exceptionHandler.handleForbiddenException(new ForbiddenException(detail));
+
+            assertThat(appender.list).singleElement().satisfies(event -> {
+                assertThat(event.getFormattedMessage())
+                    .isEqualTo("Forbidden: " + detail + " (trace: " + traceId + ")");
+                assertThat(event.getFormattedMessage()).containsOnlyOnce("organisationId");
+                assertThat(event.getThrowableProxy()).isNull();
+            });
+        } finally {
+            HANDLER_LOGGER.detachAppender(appender);
+            HANDLER_LOGGER.setLevel(null);
+        }
     }
 
     @Test
