@@ -390,6 +390,19 @@ class NotificationIT extends IntegrationBase {
         mockMvc.perform(request.header(
                 TraderOrganisationHeaderFilter.ORGANISATION_ID_HEADER, OTHER_ORGANISATION_ID))
             .andExpect(status().isNotFound());
+
+        NotificationStatus expectedStatus = "cancel-amend".equals(routeTemplate)
+            ? NotificationStatus.AMEND
+            : NotificationStatus.SUBMITTED;
+        NotificationAggregate unchanged = notificationRepository
+            .findByReferenceNumberAndOrganisationId(reference, ORGANISATION_ID)
+            .orElseThrow();
+        assertThat(unchanged.getStatus()).isEqualTo(expectedStatus);
+        assertThat(unchanged.getOrganisationId()).isEqualTo(ORGANISATION_ID);
+        assertThat(unchanged.getFulfilments()).isNullOrEmpty();
+        assertThat(notificationRepository.findAll()).hasSize(1);
+        assertThat(notificationRepository.findByReferenceNumberAndOrganisationId(reference, OTHER_ORGANISATION_ID))
+            .isEmpty();
     }
 
     static Stream<String> crossOrganisationWriteRoutes() {
