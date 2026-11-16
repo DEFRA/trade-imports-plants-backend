@@ -1,0 +1,69 @@
+package uk.gov.defra.trade.imports.plants.configuration;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Validation;
+import jakarta.validation.ValidatorFactory;
+import java.util.Set;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
+
+class NotificationTtlConfigTest {
+
+    private static NotificationTtlConfig withEnvironment(String environment) {
+        return new NotificationTtlConfig(7, environment);
+    }
+
+    private static Set<ConstraintViolation<NotificationTtlConfig>> violationsOfDays(Integer days) {
+        try (ValidatorFactory factory = Validation.buildDefaultValidatorFactory()) {
+            return factory.getValidator().validate(new NotificationTtlConfig(days, "dev"));
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"prod", "PROD", "Prod"})
+    void isProd_shouldReturnTrue_whenEnvironmentIsProdInAnyCase(String environment) {
+        assertThat(withEnvironment(environment).isProd()).isTrue();
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"local", "dev", "test", "perf-test", "ext-test", "production"})
+    void isProd_shouldReturnFalse_whenEnvironmentIsNotProdInAnyCase(String environment) {
+        assertThat(withEnvironment(environment).isProd()).isFalse();
+    }
+
+    @Test
+    void daysToStamp_shouldReturnTheDays_whenDaysAreSetOutsideProd() {
+        assertThat(new NotificationTtlConfig(7, "dev").daysToStamp()).contains(7);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"prod", "PROD"})
+    void daysToStamp_shouldReturnEmpty_whenEnvironmentIsProd(String environment) {
+        assertThat(new NotificationTtlConfig(7, environment).daysToStamp()).isEmpty();
+    }
+
+    @Test
+    void daysToStamp_shouldReturnEmpty_whenNoDaysAreSet() {
+        assertThat(new NotificationTtlConfig(null, "dev").daysToStamp()).isEmpty();
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {0, -1, -7})
+    void days_shouldFailValidation_whenNotPositive(int days) {
+        assertThat(violationsOfDays(days))
+            .singleElement()
+            .satisfies(violation -> assertThat(violation.getPropertyPath()).hasToString("days"));
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(ints = {1, 7, 90})
+    void days_shouldPassValidation_whenPositiveOrUnset(Integer days) {
+        assertThat(violationsOfDays(days)).isEmpty();
+    }
+}

@@ -24,7 +24,6 @@
     <maven.compiler.target>25</maven.compiler.target>
     <amazon.awssdk.version>2.40.2</amazon.awssdk.version>
     <mapstruct.version>1.6.3</mapstruct.version>
-    <shedlock.version>6.6.0</shedlock.version>
     <testcontainers.version>2.0.2</testcontainers.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <sonar.organization>defra</sonar.organization>
@@ -73,7 +72,6 @@
       <groupId>org.springframework.retry</groupId>
       <artifactId>spring-retry</artifactId>
     </dependency>
-    <!-- Hot-reload in the Dockerfile dev-run stage; optional so it never ships to consumers -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-devtools</artifactId>
@@ -94,17 +92,6 @@
     <dependency>
       <groupId>com.fasterxml.jackson.datatype</groupId>
       <artifactId>jackson-datatype-jsr310</artifactId>
-    </dependency>
-    <!-- Distributed lock for the notification expiry sweeper -->
-    <dependency>
-      <groupId>net.javacrumbs.shedlock</groupId>
-      <artifactId>shedlock-spring</artifactId>
-      <version>${shedlock.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>net.javacrumbs.shedlock</groupId>
-      <artifactId>shedlock-provider-mongo</artifactId>
-      <version>${shedlock.version}</version>
     </dependency>
     <!-- OpenAPI/Swagger Documentation -->
     <dependency>
@@ -192,9 +179,6 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
-          <!-- @{argLine} picks up JaCoCo's -javaagent via late-binding.
-               -XX:+EnableDynamicAgentLoading suppresses JDK warnings about Mockito
-               and ByteBuddy self-attaching as dynamic agents. -->
           <argLine>@{argLine} -XX:+EnableDynamicAgentLoading</argLine>
         </configuration>
       </plugin>
@@ -211,7 +195,6 @@
         </executions>
         <configuration>
           <skipTests>${skipTests}</skipTests>
-          <!-- See Surefire comment above for argLine rationale. -->
           <argLine>@{argLine} -XX:+EnableDynamicAgentLoading</argLine>
         </configuration>
       </plugin>

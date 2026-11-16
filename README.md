@@ -7,8 +7,8 @@ storing notifications in MongoDB.
 Its one domain package today is
 `uk.gov.defra.trade.imports.plants.notification`: the notification aggregate,
 its fulfilments, the repository, the controller and the reference-number
-generator, plus an expiry sweeper and an audit trail. The plants alpha persists
-obligations and fulfilments only — there is no outbox, no GBN-AG event
+generator, plus an audit trail and, outside prod, expiry through a Mongo TTL
+index. The plants alpha persists obligations and fulfilments only — there is no outbox, no GBN-AG event
 publishing and no PIMS routing.
 
 The frontend for this service is
