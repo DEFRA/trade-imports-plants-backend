@@ -20,39 +20,42 @@ repository `trade-imports-ins-tests` (its `plants` domain, `tests/plants/`), run
 
 Integration tests need Failsafe, so run `mvn verify` — `mvn test` skips them.
 
-* [Install MongoDB](#install-mongodb)
+* [Requirements](#requirements)
+* [Docker Compose](#docker-compose)
+* [MongoDB](#mongodb)
 * [Inspect MongoDB](#inspect-mongodb)
 * [Testing](#testing)
 * [Running](#running)
 * [Dependabot](#dependabot)
 
+### Requirements
+
+Java 25 (`.java-version`) and Maven.
+
 ### Docker Compose
 
-A Docker Compose template is in [compose.yml](compose.yml).
+A Docker Compose file is in [compose.yml](compose.yml). It starts:
 
-A local environment with:
-
-- Floci for AWS services (S3, SQS)
-- Redis
+- Floci, for AWS services (its start-up script creates no resources yet)
 - MongoDB
-- This service.
-- A commented out frontend example.
+- this service, on port 8091, with the `local` Spring profile
 
 ```bash
-docker compose --profile services up --build -d
+docker compose up --build -d
 ```
 
-A more extensive setup is available
-in [github.com/DEFRA/cdp-local-environment](https://github.com/DEFRA/cdp-local-environment)
+The full local environment, with the plants frontend and every other
+trade-imports service, is the workspace stack in
+[DEFRA/trade-imports-workspace](https://github.com/DEFRA/trade-imports-workspace).
 
 ### MongoDB
 
 #### MongoDB via Docker
 
-Run infrastructure services (MongoDB, Floci, Redis):
+Run MongoDB and Floci without this service:
 
 ```bash
-docker compose --profile infra up -d
+docker compose up -d mongodb floci
 ```
 
 #### MongoDB locally
@@ -70,7 +73,7 @@ sudo mongod --dbpath ~/mongodb-cdp
 #### MongoDB in CDP environments
 
 In CDP environments a MongoDB instance is already set up
-and the credentials exposed as enviromment variables.
+and the credentials exposed as environment variables.
 
 ### Inspect MongoDB
 
@@ -84,31 +87,39 @@ You can use the CDP Terminal to access the environments' MongoDB.
 
 ### Testing
 
-Run the tests with:
+Run the unit tests with:
 
 ```bash
 mvn test
 ```
 
-There are also application level ests run by running a full Spring Boot application backed
+There are also application-level tests that run a full Spring Boot application backed
 by [Testcontainers](https://testcontainers.com/).
 These tests do not use mocking of any sort and read and write from the containerized database.
+They need Docker running.
 
 ```bash
 mvn clean verify
 ```
 
+`mvn verify` also runs Checkstyle and the JaCoCo coverage check.
+
 ### Running
 
-Run the application:
+Run the application against a local MongoDB, with the `local` profile, which turns off
+the MongoDB TLS connection that the default profile needs:
 
 ```bash
-mvn spring-boot:run
+mvn spring-boot:run -Dspring-boot.run.profiles=local
 ```
+
+It serves on port 8091.
 
 ### SonarCloud
 
-Example SonarCloud configuration are available in the GitHub Action workflows.
+SonarCloud analysis runs in
+[.github/workflows/sonarcloud.yml](.github/workflows/sonarcloud.yml), with project
+settings in [sonar-project.properties](sonar-project.properties).
 
 ### Dependabot
 
