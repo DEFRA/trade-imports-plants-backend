@@ -1,5 +1,6 @@
 package uk.gov.defra.trade.imports.plants.notification;
 
+import io.micrometer.core.annotation.Timed;
 import java.time.Clock;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -70,6 +71,7 @@ public class NotificationService {
     }
 
     /** Creates a notification when the DTO carries no reference number, otherwise updates that one. */
+    @Timed("service.saveNotification.time")
     public NotificationAggregate saveNotification(NotificationDto notificationDto, String organisationId) {
         String referenceNumber = notificationDto.getReferenceNumber();
         if (referenceNumber == null || referenceNumber.isBlank()) {
@@ -80,6 +82,7 @@ public class NotificationService {
 
     /** Replaces the content of a DRAFT or AMEND notification, and refuses any other status. */
     @Transactional
+    @Timed("service.replace.time")
     public NotificationAggregate replace(String referenceNumber, NotificationDto dto, String organisationId) {
         return replaceContent(referenceNumber, dto, organisationId);
     }
@@ -103,6 +106,7 @@ public class NotificationService {
 
     /** Creates a new DRAFT copied from an existing notification. */
     @Transactional
+    @Timed("service.copyNotification.time")
     public NotificationAggregate copyNotification(
         String referenceNumber, Long expectedConcurrencyToken, String organisationId) {
         NotificationAggregate source = requireTraderNotification(referenceNumber, organisationId);
@@ -132,6 +136,7 @@ public class NotificationService {
      * @throws ForbiddenException when the reference exists under another organisation
      * @throws NotFoundException when no notification exists with the reference
      */
+    @Timed("service.findFulfilmentsView.time")
     public NotificationFulfilmentsView findFulfilmentsView(String referenceNumber, String organisationId) {
         Optional<NotificationFulfilmentsView> scoped =
             notificationRepository.findFulfilmentsViewByReferenceNumberAndOrganisationId(
@@ -147,6 +152,7 @@ public class NotificationService {
         throw new NotFoundException(CANNOT_FIND_NOTIFICATION_WITH_REFERENCE_NUMBER + referenceNumber);
     }
 
+    @Timed("service.findDashboardPage.time")
     public NotificationPageResponse findDashboardPage(
         int page, String sort, String referenceNumber, String organisationId) {
         List<NotificationStatus> dashboardStatuses = List.of(
@@ -177,6 +183,7 @@ public class NotificationService {
 
     /** DRAFT or AMEND to SUBMITTED. A re-submission from AMEND clears the amend baselines. */
     @Transactional
+    @Timed("service.submitNotification.time")
     public NotificationAggregate submitNotification(String referenceNumber, String organisationId) {
         NotificationAggregate notificationAggregate =
             requireTraderNotification(referenceNumber, organisationId);
@@ -193,6 +200,7 @@ public class NotificationService {
 
     /** SUBMITTED to AMEND, snapshotting the current content and fulfilments as the restore point. */
     @Transactional
+    @Timed("service.amendNotification.time")
     public NotificationAggregate amendNotification(String referenceNumber, String organisationId) {
         NotificationAggregate notificationAggregate =
             requireTraderNotification(referenceNumber, organisationId);
@@ -212,6 +220,7 @@ public class NotificationService {
 
     /** AMEND back to SUBMITTED, restoring the snapshot taken when the amendment started. */
     @Transactional
+    @Timed("service.cancelAmendNotification.time")
     public NotificationAggregate cancelAmendNotification(String referenceNumber, String organisationId) {
         NotificationAggregate notificationAggregate =
             requireTraderNotification(referenceNumber, organisationId);
@@ -257,6 +266,7 @@ public class NotificationService {
 
     /** Marks a notification DELETED, and returns one already DELETED unchanged. */
     @Transactional
+    @Timed("service.softDeleteNotification.time")
     public NotificationAggregate softDeleteNotification(String referenceNumber, String organisationId) {
         NotificationAggregate notificationAggregate =
             requireTraderNotification(referenceNumber, organisationId);
@@ -273,6 +283,7 @@ public class NotificationService {
         return saveWithStatus(notificationAggregate, NotificationStatus.DELETED);
     }
 
+    @Timed("service.findAllReferenceNumbers.time")
     public ReferenceNumberPageResponse findAllReferenceNumbers(int page) {
         log.debug("Fetching notification reference numbers page {} (size {})", page, adminPageSize);
         Page<NotificationReferenceOnly> result = notificationRepository.findAllReferencesBy(
@@ -291,6 +302,7 @@ public class NotificationService {
      * @throws NotFoundException if any reference number does not exist
      */
     @Transactional(noRollbackFor = NotFoundException.class)
+    @Timed("service.deleteByReferenceNumbers.time")
     public void deleteByReferenceNumbers(List<String> referenceNumbers, AuditContext auditContext) {
         if (referenceNumbers == null || referenceNumbers.isEmpty()) {
             return;

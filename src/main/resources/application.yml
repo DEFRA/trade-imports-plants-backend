@@ -34,8 +34,6 @@ spring:
 # CDP platform configuration
 cdp:
   certificate: ${TRUSTSTORE_CDP_ROOT_CA:}
-  metrics:
-    enabled: true
   service-version: ${SERVICE_VERSION:0.0.0-local}
   tracing:
     header-name: ${TRACING_HEADER:x-cdp-request-id}
@@ -48,11 +46,9 @@ aws:
   region: ${AWS_REGION:eu-west-2}
   emf:
     enabled: ${AWS_EMF_ENABLED:true}
-    environment: ${AWS_EMF_ENVIRONMENT:Local}
+    environment: ${AWS_EMF_ENVIRONMENT:}
     namespace: ${AWS_EMF_NAMESPACE:trade-imports-plants-backend}
-    service:
-      name: ${AWS_EMF_SERVICE_NAME:trade-imports-plants-backend}
-      type: ${AWS_EMF_SERVICE_TYPE:SpringBootApp}
+    step: ${AWS_EMF_STEP:1m}
 
 # Logging configuration
 logging:
@@ -83,10 +79,16 @@ management:
     mongo:
       enabled: false
   metrics:
-    enabled: ${METRICS_ENABLED:true}
     enable:
       all: false
       controller: true
+      service: true
+      external:
+        call:
+          duration: true
+          failure: true
+        dependency:
+          available: true
       jvm:
         memory:
           committed: true
@@ -95,10 +97,6 @@ management:
         threads:
           live: true
           peak: true
-      http:
-        server:
-          requests:
-            active: true
 
 notification:
   admin:

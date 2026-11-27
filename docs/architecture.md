@@ -9,6 +9,16 @@
 
 - AWS IAM authentication comes from the connection string: `mongodb://host:port/database?authMechanism=MONGODB-AWS&authSource=$external`.
 
+## Metrics and dependency calls
+
+- Every metric is a Micrometer meter, and `EmfMeterRegistry` publishes them to CloudWatch as Embedded Metric Format once a minute (`aws.emf.step`). `management.metrics.enable` is the allowlist: a meter whose name is not on it is a no-op.
+- `aws.emf.environment` is blank by default, so the EMF library detects the environment: on CDP that is ECS, sending to the platform's `AWS_EMF_AGENT_ENDPOINT`. `Local` writes the EMF documents to stdout.
+- MongoDB is the service's one dependency. Every command is timed at the transport by a driver `CommandListener` (`MongoCallRecorder`), published as `external.call.duration` and `external.call.failure`, tagged `dependency` and `operation`, and logged as one line with nested `event.*` fields, which `EcsEventEncoder` writes so CDP's OpenSearch keeps them.
+- A MongoDB command counts as a failed call when it errors with anything but a duplicate key, or when its reply reports a `writeConcernError` or a write error other than a duplicate key. A duplicate key is recorded as a success, because the service expects and handles it: a reference number that collides is retried with a new one. Counting it would raise `external.call.failure` while the database is healthy.
+- `external.dependency.available` for MongoDB comes from the driver's server checks, which run every 10 seconds whether or not the service makes a call.
+- `/health` does not check any dependency. CDP restarts a task whose health check fails, so a dependency outage there would restart every task.
+- The `RestClient`, `RestTemplate`, Feign logging and `StsClient` beans are configured but nothing calls them, so they have no metrics.
+
 ## Dates and times in MongoDB
 
 - MongoDB has no date-only type. Its `Date` is a moment, so storing a calendar date as one means choosing a zone. Spring Data's built-in converter chooses the JVM default zone, so under `Europe/London` in summer `2026-07-21` is stored as `2026-07-20T23:00:00Z`, a day early.
