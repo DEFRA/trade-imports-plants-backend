@@ -1,7 +1,7 @@
 package uk.gov.defra.trade.imports.plants.configuration;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static uk.gov.defra.trade.imports.plants.utils.LogCapture.logEventsDuring;
+import static uk.gov.defra.trade.imports.plants.testsupport.CapturedLogs.loggedBy;
 
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import java.util.List;
@@ -32,7 +32,7 @@ class ProxyConfigTest {
     void configureProxy_unusableUrlWithCredentials_logsRedactedUrlWithoutCredentialsOrThrowable(String proxyUrl) {
         ReflectionTestUtils.setField(proxyConfig, "httpProxy", proxyUrl);
 
-        List<ILoggingEvent> events = logEventsDuring(ProxyConfig.class, proxyConfig::configureProxy);
+        List<ILoggingEvent> events = loggedBy(ProxyConfig.class, proxyConfig::configureProxy);
 
         assertThat(System.getProperty("http.proxyHost")).isNull();
         assertThat(events).isNotEmpty().allSatisfy(event -> {

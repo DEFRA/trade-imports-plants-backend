@@ -8,8 +8,8 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static uk.gov.defra.trade.imports.plants.utils.LogCapture.logEventsDuring;
-import static uk.gov.defra.trade.imports.plants.utils.LogCapture.messagesOf;
+import static uk.gov.defra.trade.imports.plants.testsupport.CapturedLogs.loggedBy;
+import static uk.gov.defra.trade.imports.plants.testsupport.CapturedLogs.messagesOf;
 
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import java.time.Clock;
@@ -214,7 +214,7 @@ class NotificationServiceTest {
 
     @Test
     void saveNotification_shouldLogTheThrowableOfEachCollision_whenAllPersistenceAttemptsCollide() {
-        List<ILoggingEvent> events = logEventsDuring(NotificationService.class,
+        List<ILoggingEvent> events = loggedBy(NotificationService.class,
             () -> saveWhoseThreeAttemptsCollide(new DuplicateKeyException("last collision")));
 
         assertThat(events)
@@ -493,7 +493,7 @@ class NotificationServiceTest {
     }
 
     private static List<String> messagesLoggedDuring(Runnable action) {
-        return messagesOf(logEventsDuring(NotificationService.class, action));
+        return messagesOf(loggedBy(NotificationService.class, action));
     }
 
     @Test

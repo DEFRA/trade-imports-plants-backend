@@ -1,7 +1,12 @@
 package uk.gov.defra.trade.imports.plants.integration;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.testcontainers.utility.DockerImageName.parse;
+import static uk.gov.defra.trade.imports.plants.testsupport.TraderOrganisationTestSupport.ORGANISATION_ID;
+import static uk.gov.defra.trade.imports.plants.testsupport.TraderOrganisationTestSupport.withOrganisation;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterEach;
@@ -9,6 +14,10 @@ import org.mockserver.client.MockServerClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -20,6 +29,9 @@ import org.testcontainers.containers.MockServerContainer;
 import org.testcontainers.containers.MongoDBContainer;
 import org.testcontainers.lifecycle.Startables;
 import org.testcontainers.utility.DockerImageName;
+import uk.gov.defra.trade.imports.plants.notification.NotificationAggregate;
+import uk.gov.defra.trade.imports.plants.notification.NotificationDto;
+import uk.gov.defra.trade.imports.plants.notification.SaveNotificationDto;
 
 @Slf4j
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -36,14 +48,24 @@ abstract class IntegrationBase {
   @Autowired
   protected MockMvc mockMvc;
 
+  @Autowired
+  protected MongoTemplate mongoTemplate;
+
+  @Autowired
+  private ObjectMapper objectMapper;
+
+  @Value("${cdp.tracing.header-name}")
+  private String traceIdHeader;
+
   private MockServerClient mockServerClient;
 
   static final MockServerContainer MOCK_SERVER_CONTAINER = new MockServerContainer(
       parse("mockserver/mockserver").withTag(
           "mockserver-" + MockServerClient.class.getPackage().getImplementationVersion()));
 
-  static MongoDBContainer MONGO_CONTAINER = new MongoDBContainer(
-      DockerImageName.parse("mongo:7.0")).withExposedPorts(27017);
+  static final DockerImageName MONGO_IMAGE = DockerImageName.parse("mongo:7.0");
+
+  static MongoDBContainer MONGO_CONTAINER = new MongoDBContainer(MONGO_IMAGE).withExposedPorts(27017);
 
   static {
     Startables.deepStart(
@@ -83,6 +105,18 @@ abstract class IntegrationBase {
   @AfterEach
   void tearDown() {
     usingStub().reset();
+  }
+
+  NotificationAggregate createNewNotification(String traceId) throws Exception {
+    MvcResult result = mockMvc.perform(withOrganisation(post("/notifications"), ORGANISATION_ID)
+            .header(traceIdHeader, traceId)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(
+                SaveNotificationDto.of(NotificationDto.builder().build()))))
+        .andExpect(status().isOk())
+        .andReturn();
+    return objectMapper.readValue(
+        result.getResponse().getContentAsString(), NotificationAggregate.class);
   }
 
 }

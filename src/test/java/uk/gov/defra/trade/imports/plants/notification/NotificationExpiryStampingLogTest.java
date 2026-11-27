@@ -1,8 +1,8 @@
 package uk.gov.defra.trade.imports.plants.notification;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static uk.gov.defra.trade.imports.plants.utils.LogCapture.logEventsDuring;
-import static uk.gov.defra.trade.imports.plants.utils.LogCapture.messagesOf;
+import static uk.gov.defra.trade.imports.plants.testsupport.CapturedLogs.loggedBy;
+import static uk.gov.defra.trade.imports.plants.testsupport.CapturedLogs.messagesOf;
 
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -13,7 +13,7 @@ import uk.gov.defra.trade.imports.plants.configuration.NotificationTtlConfig;
 class NotificationExpiryStampingLogTest {
 
     private static List<String> messagesLoggedBy(NotificationTtlConfig ttlConfig) {
-        return messagesOf(logEventsDuring(NotificationExpiryStampingLog.class,
+        return messagesOf(loggedBy(NotificationExpiryStampingLog.class,
             new NotificationExpiryStampingLog(ttlConfig)::logExpiryStamping));
     }
 
